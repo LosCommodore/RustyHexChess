@@ -2,6 +2,14 @@
 
 use anyhow::Result;
 use std::{char };
+use std::io::{stdout, Write};
+
+use crossterm::{
+    execute,
+    cursor::MoveToNextLine,
+    style::{Color, Print, ResetColor, SetForegroundColor},
+};
+
 
 struct Board {
     pieces: Vec<Piece>
@@ -57,12 +65,6 @@ impl MovementPattern {
 }
 
  */
-use std::io::{stdout, Write};
-
-use crossterm::{
-    execute,
-    style::{Color, Print, ResetColor, SetForegroundColor},
-};
 
 fn draw() -> std::io::Result<()> {
     let mut out = stdout();
@@ -86,6 +88,49 @@ fn draw() -> std::io::Result<()> {
 
     out.flush()?;
     Ok(())
+}
+
+
+/// 11x11 board with spaces
+/// - no "j"
+/// - 1..11 + a-l
+/// - not all cominaitons allowed
+/// 
+/// l
+fn print_board() -> Result<()> {
+    let board_dim = 11;
+    let edge_len= 6;
+
+    let mut out = stdout();
+
+    let mut columns = edge_len;
+    
+    let initial_x_offset = 20;
+    let mut space_count=0isize; 
+    for y in 0..board_dim {
+        let inc: isize =if  y< board_dim /2 { 1 } else {-1};
+
+        let nr_spaces = (initial_x_offset-space_count*3) as usize;
+        let s = " ".repeat(nr_spaces);
+        
+        execute!(out, Print(s))?;
+        for _ in 0..columns {
+            execute!(
+                out,
+                Print("[ x ] "),
+
+            )?;
+        }
+        execute!(out,MoveToNextLine(1))?;
+        
+        space_count+=inc;
+        columns+=inc;
+
+    }
+
+    out.flush()?;
+    Ok(())
+
 }
 
 /*
@@ -124,5 +169,6 @@ fn main() -> Result<()> {
     let x = piece.to_human_coordinates()?;
     draw()?;
     println!("Hello, world! {x:?}");
+    print_board()?;
     Ok(())
 }
