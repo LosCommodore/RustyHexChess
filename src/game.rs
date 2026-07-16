@@ -26,6 +26,8 @@ enum Movement {
     Jump(Vec<Offset>),
 }
 
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PieceType {
     King,
     Queen,
@@ -35,7 +37,9 @@ pub enum PieceType {
     Pawn,
 }
 
-pub enum PieceColor {
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PlayerColor {
     Black,
     White,
 }
@@ -56,11 +60,14 @@ const KING_MOVEMENTS: &'static [Movement] = &[
 pub struct Piece {
     position: (usize, usize),
     piece_type: PieceType,
-    color: PieceColor,
+    color: PlayerColor,
 }
 
+type HumanCoordinates = (char, usize); // e.g. ('a',1) -> see doc folder
+type InternalCooridates = (usize, usize); // 0-indexed
+
 impl Piece {
-    pub fn new(pos: (char, usize), piece_type: PieceType, color: PieceColor) -> Result<Self> {
+    pub fn new(pos: HumanCoordinates, piece_type: PieceType, color: PlayerColor) -> Result<Self> {
         let position = to_internal_coordinates(pos)?;
         Ok(Piece {
             position,
@@ -68,17 +75,31 @@ impl Piece {
             color,
         })
     }
-
-    fn to_human_coordinates(&self) -> Result<(char, usize)> {
-        let code = self.position.0 + 65;
-        let c = char::from(u8::try_from(code)?);
-
-        let y = (self.position.1) + 1;
-        Ok((c, y))
-    }
 }
 
-fn to_internal_coordinates((y, x): (char, usize)) -> Result<(usize, usize)> {
+fn to_human_coordinates((y, x): InternalCooridates) -> Result<HumanCoordinates> {
+    let mut code = y + 65;
+
+    if code >= 74 {
+        // skip J (74)
+        code += 1;
+    }
+    let c = char::from(u8::try_from(code)?);
+
+    Ok((c, x + 1))
+}
+
+fn get_startup_pieces_black() -> Result<Vec<Piece>> {
+    let color = PlayerColor::Black;
+
+    Ok(vec![
+        Piece::new(('A', 1), PieceType::King, color)?,
+    ])
+}
+
+fn to_internal_coordinates((y, x): HumanCoordinates) -> Result<InternalCooridates> {
+    // TODO: Check if coordinates are on board.
+
     if !y.is_ascii() {
         bail!("First item of position must be ascii")
     }
@@ -92,7 +113,19 @@ fn to_internal_coordinates((y, x): (char, usize)) -> Result<(usize, usize)> {
     if !(97..=108).contains(&y) {
         bail!("First item of position must be between 'a' and 'l'")
     }
-
-    // Todo: check if coordinates are on board
     Ok((y, x))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn to_human() {
+        let human = to_human_coordinates((1, 1)).unwrap();
+        assert_eq!(human, ('B', 2));
+
+        let human = to_human_coordinates((10, 5)).unwrap();
+        assert_eq!(human, ('L', 6));
+    }
 }
