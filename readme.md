@@ -22,6 +22,6 @@ As a first step the game will be rendered in the terminal. It is easier to displ
         G  [ Q ][ . ][ . ][ P ][ . ][ . ][ P ][ . ][ . ][ Q ]
            H  [ N ][ . ][ P ][ . ][ . ][ . ][ P ][ . ][ N ]
               I  [ R ][ P ][ . ][ . ][ . ][ . ][ P ][ R ]
-                 K  [ . ][ . ][ . ][ . ][ . ][ . ][ . ]
+                 K  [ P ][ . ][ . ][ . ][ . ][ . ][ P ]
                     L  [ . ][ . ][ . ][ . ][ . ][ . ]
 ```

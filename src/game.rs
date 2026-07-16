@@ -99,17 +99,6 @@ impl Piece {
     }
 }
 
-fn to_human_coordinates((y, x): InternalCooridates) -> Result<HumanCoordinates> {
-    let mut code = y + 65;
-
-    if code >= 74 {
-        // skip J (74)
-        code += 1;
-    }
-    let c = char::from(u8::try_from(code)?);
-
-    Ok((c, x + 1))
-}
 
 pub fn get_startup_pieces_black() -> Result<Vec<Piece>> {
     let color = Color::Black;
@@ -171,6 +160,18 @@ pub fn get_startup_pieces_white() -> Result<Vec<Piece>> {
     Ok(pieces)
 }
 
+fn to_human_coordinates((y, x): InternalCooridates) -> Result<HumanCoordinates> {
+    let mut code = y + 65;
+
+    if code >= 74 {
+        // skip J (74)
+        code += 1;
+    }
+    let c = char::from(u8::try_from(code)?);
+
+    Ok((c, x + 1))
+}
+
 fn to_internal_coordinates((y, x): HumanCoordinates) -> Result<InternalCooridates> {
     // TODO: Check if coordinates are on board.
 
@@ -188,8 +189,8 @@ fn to_internal_coordinates((y, x): HumanCoordinates) -> Result<InternalCooridate
         bail!("First item of position must be between 'a' and 'l'")
     }
 
-    if y >= 106 {
-        y += 1; // skip J (74)
+    if y > 106 {
+        y -= 1; // skip J
     }
 
     y -= 97;
@@ -208,5 +209,14 @@ mod tests {
 
         let human = to_human_coordinates((10, 5)).unwrap();
         assert_eq!(human, ('L', 6));
+    }
+
+    #[test]
+    fn to_internal_skips_j() {
+        let internal = to_internal_coordinates(('K', 1)).unwrap();
+        assert_eq!(internal, (9, 0));
+
+        let internal = to_internal_coordinates(('L', 1)).unwrap();
+        assert_eq!(internal, (10, 0));
     }
 }
