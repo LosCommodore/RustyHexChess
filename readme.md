@@ -8,18 +8,20 @@
 
 As a first step the game will be rendered in the terminal. It is easier to display rotated 90 degrees:
 
+![terminal imagage](./doc/terminal.png)
+
 ```text
-                        1      2     3     4     5     6  
-                        /     /     /     /     /     /   7     
-                  A  [ x ] [ x ] [ x ] [ x ] [ x ] [ x ] /   8
-              B   [ x ] [ x ] [ x ] [ x ] [ x ] [ x ] [ x ]  /  9
-           C   [ x ] [ x ] [ x ] [ x ] [ x ] [ x ] [ x ] [ x ] /   10
-        D   [ x ] [ x ] [ x ] [ x ] [ x ] [ x ] [ x ] [ x ] [ x ] /   11 
-     E   [ x ] [ x ] [ x ] [ x ] [ x ] [ x ] [ x ] [ x ] [ x ] [ x ] / 
-  F   [ x ] [ x ] [ x ] [ x ] [ x ] [ x ] [ x ] [ x ] [ x ] [ x ] [ x ] 
-     G   [ x ] [ x ] [ x ] [ x ] [ x ] [ x ] [ x ] [ x ] [ x ] [ x ] 
-       H    [ x ] [ x ] [ x ] [ x ] [ x ] [ x ] [ x ] [ x ] [ x ] 
-          I    [ x ] [ x ] [ x ] [ x ] [ x ] [ x ] [ x ] [ x ] 
-            K     [ x ] [ x ] [ x ] [ x ] [ x ] [ x ] [ x ] 
-               L     [ x ] [ x ] [ x ] [ x ] [ x ] [ x ] 
+                          1    2    3    4    5    6
+                         /    /    /    /    /    /    7
+                    A  [ . ][ . ][ . ][ . ][ . ][ . ] /  8
+                 B  [ P ][ . ][ . ][ . ][ . ][ . ][ P ] /  9
+              C  [ R ][ P ][ . ][ . ][ . ][ . ][ P ][ R ] /  10
+           D  [ N ][ . ][ P ][ . ][ . ][ . ][ P ][ . ][ N ] /  11
+        E  [ K ][ . ][ . ][ P ][ . ][ . ][ P ][ . ][ . ][ K ] /
+     F  [ B ][ B ][ B ][ . ][ P ][ . ][ P ][ . ][ B ][ B ][ B ]
+        G  [ Q ][ . ][ . ][ P ][ . ][ . ][ P ][ . ][ . ][ Q ]
+           H  [ N ][ . ][ P ][ . ][ . ][ . ][ P ][ . ][ N ]
+              I  [ R ][ P ][ . ][ . ][ . ][ . ][ P ][ R ]
+                 K  [ . ][ . ][ . ][ . ][ . ][ . ][ . ]
+                    L  [ . ][ . ][ . ][ . ][ . ][ . ]
 ```
