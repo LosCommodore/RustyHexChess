@@ -1,7 +1,6 @@
 #![allow(unused)]
 
 use anyhow::{Result, bail};
-
 const EDGE_LEN: usize = 6;
 
 struct Board {
@@ -26,7 +25,6 @@ enum Movement {
     Jump(Vec<Offset>),
 }
 
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PieceType {
     King,
@@ -37,9 +35,21 @@ pub enum PieceType {
     Pawn,
 }
 
+impl PieceType {
+    pub fn symbol(self) -> char {
+        match self {
+            PieceType::King => 'K',
+            PieceType::Queen => 'Q',
+            PieceType::Bishop => 'B',
+            PieceType::Knight => 'N',
+            PieceType::Rook => 'R',
+            PieceType::Pawn => 'P',
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PlayerColor {
+pub enum Color {
     Black,
     White,
 }
@@ -58,22 +68,34 @@ const KING_MOVEMENTS: &'static [Movement] = &[
 ];
 
 pub struct Piece {
-    position: (usize, usize),
+    position: InternalCooridates,
     piece_type: PieceType,
-    color: PlayerColor,
+    color: Color,
 }
 
 type HumanCoordinates = (char, usize); // e.g. ('a',1) -> see doc folder
 type InternalCooridates = (usize, usize); // 0-indexed
 
 impl Piece {
-    pub fn new(pos: HumanCoordinates, piece_type: PieceType, color: PlayerColor) -> Result<Self> {
+    pub fn new(pos: HumanCoordinates, piece_type: PieceType, color: Color) -> Result<Self> {
         let position = to_internal_coordinates(pos)?;
         Ok(Piece {
             position,
             piece_type,
             color,
         })
+    }
+
+    pub fn position(&self) -> InternalCooridates {
+        self.position
+    }
+
+    pub fn piece_type(&self) -> PieceType {
+        self.piece_type
+    }
+
+    pub fn color(&self) -> Color {
+        self.color
     }
 }
 
@@ -89,12 +111,64 @@ fn to_human_coordinates((y, x): InternalCooridates) -> Result<HumanCoordinates> 
     Ok((c, x + 1))
 }
 
-fn get_startup_pieces_black() -> Result<Vec<Piece>> {
-    let color = PlayerColor::Black;
+pub fn get_startup_pieces_black() -> Result<Vec<Piece>> {
+    let color = Color::Black;
 
-    Ok(vec![
-        Piece::new(('A', 1), PieceType::King, color)?,
-    ])
+    let mut pieces = vec![
+        Piece::new(('E', 10), PieceType::King, color)?,
+        Piece::new(('G', 10), PieceType::Queen, color)?,
+        Piece::new(('F', 11), PieceType::Bishop, color)?,
+        Piece::new(('F', 10), PieceType::Bishop, color)?,
+        Piece::new(('F', 9), PieceType::Bishop, color)?,
+        Piece::new(('D', 9), PieceType::Knight, color)?,
+        Piece::new(('H', 9), PieceType::Knight, color)?,
+        Piece::new(('C', 8), PieceType::Rook, color)?,
+        Piece::new(('I', 8), PieceType::Rook, color)?,
+    ];
+
+    let pawns: Vec<Piece> = ['b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'k']
+        .into_iter()
+        .map(|i| Piece::new((i, 7), PieceType::Pawn, color))
+        .collect::<Result<_, _>>()?;
+
+    pieces.extend(pawns);
+
+    Ok(pieces)
+}
+
+pub fn get_startup_pieces_white() -> Result<Vec<Piece>> {
+    let color = Color::White;
+
+    let mut pieces = vec![
+        Piece::new(('E', 1), PieceType::King, color)?,
+        Piece::new(('G', 1), PieceType::Queen, color)?,
+        Piece::new(('F', 1), PieceType::Bishop, color)?,
+        Piece::new(('F', 2), PieceType::Bishop, color)?,
+        Piece::new(('F', 3), PieceType::Bishop, color)?,
+        Piece::new(('D', 1), PieceType::Knight, color)?,
+        Piece::new(('H', 1), PieceType::Knight, color)?,
+        Piece::new(('C', 1), PieceType::Rook, color)?,
+        Piece::new(('I', 1), PieceType::Rook, color)?,
+    ];
+
+    let pawns: Vec<Piece> = [
+        ('b', 1),
+        ('c', 2),
+        ('d', 3),
+        ('e', 4),
+        ('f', 5),
+        ('g', 4),
+        ('h', 3),
+        ('i', 2),
+        ('k', 1),
+    ]
+    .into_iter()
+    .map(|pos| Piece::new(pos, PieceType::Pawn, color))
+    .collect::<Result<_, _>>()?;
+
+    pieces.extend(pawns);
+
+    Ok(pieces)
 }
 
 fn to_internal_coordinates((y, x): HumanCoordinates) -> Result<InternalCooridates> {
@@ -109,11 +183,18 @@ fn to_internal_coordinates((y, x): HumanCoordinates) -> Result<InternalCooridate
         bail!("Letter 'j' is not used!")
     }
 
-    let y = y as usize; // a = 65
+    let mut y = y as usize; // a = 97
     if !(97..=108).contains(&y) {
         bail!("First item of position must be between 'a' and 'l'")
     }
-    Ok((y, x))
+
+    if y >= 106 {
+        y += 1; // skip J (74)
+    }
+
+    y -= 97;
+
+    Ok((y, x - 1))
 }
 
 #[cfg(test)]
