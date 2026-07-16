@@ -5,24 +5,25 @@ use crossterm::style::{Color, SetBackgroundColor, SetForegroundColor};
 use crossterm::{cursor::MoveToNextLine, execute, style::Print};
 use std::io::{Write, stdout};
 
+const BOARD_DIM: usize = 11;
+const EDGE_LEN: usize = 6;
+const CELL_WIDTH: usize = 5;
+const INITIAL_X_OFFSET: isize = 20;
 
-pub fn print_board(pieces: &Vec<Piece>) -> Result<()> {
-    let board_dim = 11;
-    let edge_len = 6;
-
+pub fn print_board(pieces: &[Piece]) -> Result<()> {
     let mut out = stdout();
 
-    let mut columns = edge_len;
+    print_column_labels(&mut out)?;
 
-    let initial_x_offset = 20;
+    let mut columns = EDGE_LEN;
     let mut space_count = 0isize;
-    for y in 0..board_dim {
-        let inc: isize = if y < board_dim / 2 { 1 } else { -1 };
+    for y in 0..BOARD_DIM {
+        let inc: isize = if y < BOARD_DIM / 2 { 1 } else { -1 };
 
-        let nr_spaces = (initial_x_offset - space_count * 3) as usize;
+        let nr_spaces = (INITIAL_X_OFFSET - space_count * 3) as usize;
         let s = " ".repeat(nr_spaces);
 
-        execute!(out, Print(s))?;
+        execute!(out, Print(s), Print(format!("{}  ", row_label(y))))?;
         for x in 0..columns {
             let piece = pieces.iter().find(|p| p.position() == (y, x));
 
@@ -49,6 +50,7 @@ pub fn print_board(pieces: &Vec<Piece>) -> Result<()> {
                 SetBackgroundColor(Color::Reset),
             )?;
         }
+        print_diagonal_column_label(&mut out, y)?;
         execute!(out, MoveToNextLine(1))?;
 
         space_count += inc;
@@ -57,4 +59,45 @@ pub fn print_board(pieces: &Vec<Piece>) -> Result<()> {
 
     out.flush()?;
     Ok(())
+}
+
+fn print_column_labels(out: &mut impl Write) -> Result<()> {
+    let board_start = INITIAL_X_OFFSET as usize + 3;
+    let padding = " ".repeat(board_start);
+
+    execute!(out, Print(&padding))?;
+    for x in 1..=EDGE_LEN {
+        execute!(out, Print(format!("{:^width$}", x, width = CELL_WIDTH)))?;
+    }
+    execute!(out, MoveToNextLine(1))?;
+
+    execute!(out, Print(&padding))?;
+    for _ in 0..EDGE_LEN {
+        execute!(out, Print(format!("{:^width$}", "/", width = CELL_WIDTH)))?;
+    }
+    execute!(out, Print(format!(" {}", EDGE_LEN + 1)))?;
+    execute!(out, MoveToNextLine(1))?;
+
+    Ok(())
+}
+
+fn print_diagonal_column_label(out: &mut impl Write, y: usize) -> Result<()> {
+    if y >= EDGE_LEN - 1 {
+        return Ok(());
+    }
+
+    execute!(out, Print(" /"))?;
+    if y < EDGE_LEN - 2 {
+        execute!(out, Print(format!(" {}", EDGE_LEN + y + 2)))?;
+    }
+
+    Ok(())
+}
+
+fn row_label(y: usize) -> char {
+    let mut code = b'A' + y as u8;
+    if code >= b'J' {
+        code += 1;
+    }
+    code as char
 }
