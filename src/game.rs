@@ -1,6 +1,6 @@
 #![allow(unused)]
 
-use anyhow::{Result, bail};
+use anyhow::{Ok, Result, bail};
 const EDGE_LEN: usize = 6;
 
 struct Board {
@@ -99,7 +99,6 @@ impl Piece {
     }
 }
 
-
 pub fn get_startup_pieces_black() -> Result<Vec<Piece>> {
     let color = Color::Black;
 
@@ -160,22 +159,21 @@ pub fn get_startup_pieces_white() -> Result<Vec<Piece>> {
     Ok(pieces)
 }
 
-fn to_human_coordinates((y, x): InternalCooridates) -> Result<HumanCoordinates> {
-    let mut code = y + 65;
-
+pub fn num_to_char_notation(num:usize) -> Result<char> {
+    let mut code = num + 65;
+    
     if code >= 74 {
         // skip J (74)
         code += 1;
     }
     let c = char::from(u8::try_from(code)?);
-
-    Ok((c, x + 1))
+    Ok(c)
 }
 
-fn to_internal_coordinates((y, x): HumanCoordinates) -> Result<InternalCooridates> {
-    // TODO: Check if coordinates are on board.
+pub fn char_to_num_notation(y: char) -> Result<usize> {
+  // TODO: Check if coordinates are on board.
 
-    if !y.is_ascii() {
+  if !y.is_ascii() {
         bail!("First item of position must be ascii")
     }
     let y = y.to_ascii_lowercase();
@@ -194,7 +192,16 @@ fn to_internal_coordinates((y, x): HumanCoordinates) -> Result<InternalCooridate
     }
 
     y -= 97;
+    Ok(y)
+}
 
+fn to_human_coordinates((y, x): InternalCooridates) -> Result<HumanCoordinates> {
+    let c = num_to_char_notation(y)?;
+    Ok((c, x + 1))
+}
+
+fn to_internal_coordinates((y, x): HumanCoordinates) -> Result<InternalCooridates> {
+   let y = char_to_num_notation(y)?;
     Ok((y, x - 1))
 }
 
