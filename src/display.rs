@@ -1,6 +1,6 @@
-use crate::game::{coordinates::num_to_char_notation};
-use crate::game::piece::{Piece};
+use crate::game::coordinates::num_to_char_notation;
 use crate::game::piece::Color as PieceColor;
+use crate::game::piece::Piece;
 
 use anyhow::Result;
 use crossterm::style::{Color, SetBackgroundColor, SetForegroundColor};
@@ -28,7 +28,7 @@ pub fn print_board(pieces: &[Piece]) -> Result<()> {
         execute!(out, Print(whitespace), Print(format!("{char_notation}  ")))?;
 
         for x in 0..columns {
-            print_cell(&pieces,y,x,&mut out)?;
+            print_cell(&pieces, y, x, &mut out)?;
         }
         print_diagonal_column_label(&mut out, y)?;
         execute!(out, MoveToNextLine(1))?;
@@ -69,7 +69,6 @@ fn print_cell(pieces: &[Piece], y: usize, x: usize, out: &mut impl Write) -> Res
     Ok(())
 }
 
-
 fn print_column_labels(out: &mut impl Write) -> Result<()> {
     let board_start = INITIAL_X_OFFSET as usize + 3;
     let padding = " ".repeat(board_start);
@@ -102,4 +101,3 @@ fn print_diagonal_column_label(out: &mut impl Write, y: usize) -> Result<()> {
 
     Ok(())
 }
-

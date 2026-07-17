@@ -2,11 +2,10 @@ use super::coordinates::*;
 use anyhow::{Ok, Result};
 
 pub struct Piece {
-    position: InternalCooridates,
+    position: InternalCoordinates,
     piece_type: PieceType,
     color: Color,
 }
-
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Color {
@@ -47,7 +46,7 @@ impl Piece {
         })
     }
 
-    pub fn position(&self) -> InternalCooridates {
+    pub fn position(&self) -> InternalCoordinates {
         self.position
     }
 

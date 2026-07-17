@@ -1,7 +1,7 @@
 use anyhow::{Ok, Result, bail};
 
 pub type HumanCoordinates = (char, usize); // e.g. ('a',1) -> see doc folder
-pub type InternalCooridates = (usize, usize); // 0-indexed
+pub type InternalCoordinates = (usize, usize); // 0-indexed
 
 pub fn num_to_char_notation(num: usize) -> Result<char> {
     let mut code = num + 65;
@@ -40,12 +40,12 @@ pub fn char_to_num_notation(y: char) -> Result<usize> {
 }
 
 #[allow(unused)]
-pub fn to_human_coordinates((y, x): InternalCooridates) -> Result<HumanCoordinates> {
+pub fn to_human_coordinates((y, x): InternalCoordinates) -> Result<HumanCoordinates> {
     let c = num_to_char_notation(y)?;
     Ok((c, x + 1))
 }
 
-pub fn to_internal_coordinates((y, x): HumanCoordinates) -> Result<InternalCooridates> {
+pub fn to_internal_coordinates((y, x): HumanCoordinates) -> Result<InternalCoordinates> {
     let y = char_to_num_notation(y)?;
     Ok((y, x - 1))
 }

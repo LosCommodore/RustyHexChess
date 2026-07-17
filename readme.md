@@ -8,7 +8,7 @@
 
 As a first step the game will be rendered in the terminal. It is easier to display rotated 90 degrees:
 
-![terminal imagage](./doc/terminal.png)
+![terminal image](./doc/terminal.png)
 
 ```text
                           1    2    3    4    5    6
