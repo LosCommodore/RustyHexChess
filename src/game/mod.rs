@@ -1,13 +1,11 @@
 
 pub mod coordinates;
 pub mod piece;
-mod movement;
-use piece::Piece;
+pub mod board;
 
-#[allow(unused)]
-struct Board {
-    pieces: Vec<Piece>,
-}
+mod movement;
+
+
 
 
 
