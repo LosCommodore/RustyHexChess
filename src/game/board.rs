@@ -22,29 +22,22 @@ impl Board {
             bail!("No piece on this coordinate");
         };
 
-        let patterns = get_movement_patterns(me.piece_type());
-        for p in patterns {
-            let start_pos = me.position();
-            let mut options: Vec<InternalCoordinates> = Vec::new();
-
+        let mut options: Vec<InternalCoordinates> = Vec::new();
+        for p in get_movement_patterns(me.piece_type()) {
             match p {
                 MovementPattern::Walk(offset) => {
-                    options.extend(do_walk(start_pos, me, *offset, &self.pieces));
+                    options.extend(do_walk(me, *offset, &self.pieces));
                 }
                 _ => todo!(),
             }
         }
-        todo!()
+        Ok(options)
     }
 }
 
-fn do_walk(
-    mut pos: InternalCoordinates,
-    me: &Piece,
-    offset: (isize, isize),
-    pieces: &Vec<Piece>,
-) -> Vec<InternalCoordinates> {
+fn do_walk(me: &Piece, offset: (isize, isize), pieces: &Vec<Piece>) -> Vec<InternalCoordinates> {
     let mut options = Vec::new();
+    let mut pos = me.position();
     loop {
         let Some(x) = pos.0.checked_add_signed(offset.0) else {
             return options;
