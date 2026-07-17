@@ -10,34 +10,6 @@ const EDGE_LEN: usize = 6;
 const CELL_WIDTH: usize = 5;
 const INITIAL_X_OFFSET: isize = 20;
 
-pub fn print_cell(pieces: &[Piece], y: usize, x: usize, out: &mut impl Write) -> Result<()> {
-    let piece = pieces.iter().find(|p| p.position() == (y, x));
-
-    let cell_color = match piece {
-        Some(p) => match p.color() {
-            game::Color::Black => Color::Blue,
-            game::Color::White => Color::Red,
-        },
-        None => Color::Reset,
-    };
-
-    let symbol = match piece {
-        Some(x) => x.piece_type().symbol(),
-        None => '.',
-    };
-
-    let symbol: String = format!("[ {symbol} ]");
-
-    execute!(
-        out,
-        SetBackgroundColor(cell_color),
-        Print(&symbol),
-        SetForegroundColor(Color::White),
-        SetBackgroundColor(Color::Reset),
-    )?;
-    Ok(())
-}
-
 pub fn print_board(pieces: &[Piece]) -> Result<()> {
     let mut out = stdout();
 
@@ -66,6 +38,35 @@ pub fn print_board(pieces: &[Piece]) -> Result<()> {
     out.flush()?;
     Ok(())
 }
+
+fn print_cell(pieces: &[Piece], y: usize, x: usize, out: &mut impl Write) -> Result<()> {
+    let piece = pieces.iter().find(|p| p.position() == (y, x));
+
+    let cell_color = match piece {
+        Some(p) => match p.color() {
+            game::Color::Black => Color::Blue,
+            game::Color::White => Color::Red,
+        },
+        None => Color::Reset,
+    };
+
+    let symbol = match piece {
+        Some(x) => x.piece_type().symbol(),
+        None => '.',
+    };
+
+    let symbol: String = format!("[ {symbol} ]");
+
+    execute!(
+        out,
+        SetBackgroundColor(cell_color),
+        Print(&symbol),
+        SetForegroundColor(Color::White),
+        SetBackgroundColor(Color::Reset),
+    )?;
+    Ok(())
+}
+
 
 fn print_column_labels(out: &mut impl Write) -> Result<()> {
     let board_start = INITIAL_X_OFFSET as usize + 3;

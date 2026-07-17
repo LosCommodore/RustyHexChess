@@ -159,9 +159,9 @@ pub fn get_startup_pieces_white() -> Result<Vec<Piece>> {
     Ok(pieces)
 }
 
-pub fn num_to_char_notation(num:usize) -> Result<char> {
+pub fn num_to_char_notation(num: usize) -> Result<char> {
     let mut code = num + 65;
-    
+
     if code >= 74 {
         // skip J (74)
         code += 1;
@@ -171,9 +171,9 @@ pub fn num_to_char_notation(num:usize) -> Result<char> {
 }
 
 pub fn char_to_num_notation(y: char) -> Result<usize> {
-  // TODO: Check if coordinates are on board.
+    // TODO: Check if coordinates are on board.
 
-  if !y.is_ascii() {
+    if !y.is_ascii() {
         bail!("First item of position must be ascii")
     }
     let y = y.to_ascii_lowercase();
@@ -201,7 +201,7 @@ fn to_human_coordinates((y, x): InternalCooridates) -> Result<HumanCoordinates> 
 }
 
 fn to_internal_coordinates((y, x): HumanCoordinates) -> Result<InternalCooridates> {
-   let y = char_to_num_notation(y)?;
+    let y = char_to_num_notation(y)?;
     Ok((y, x - 1))
 }
 
