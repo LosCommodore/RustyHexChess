@@ -1,5 +1,7 @@
-use crate::game::{self, num_to_char_notation};
-use crate::game::Piece;
+use crate::game::{coordinates::num_to_char_notation};
+use crate::game::piece::{Piece};
+use crate::game::piece::Color as PieceColor;
+
 use anyhow::Result;
 use crossterm::style::{Color, SetBackgroundColor, SetForegroundColor};
 use crossterm::{cursor::MoveToNextLine, execute, style::Print};
@@ -44,8 +46,8 @@ fn print_cell(pieces: &[Piece], y: usize, x: usize, out: &mut impl Write) -> Res
 
     let cell_color = match piece {
         Some(p) => match p.color() {
-            game::Color::Black => Color::Blue,
-            game::Color::White => Color::Red,
+            PieceColor::Black => Color::Blue,
+            PieceColor::White => Color::Red,
         },
         None => Color::Reset,
     };

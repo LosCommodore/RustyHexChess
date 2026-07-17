@@ -1,28 +1,17 @@
-#![allow(unused)]
+use super::coordinates::*;
+use anyhow::{Ok, Result};
 
-use anyhow::{Ok, Result, bail};
-const EDGE_LEN: usize = 6;
-
-struct Board {
-    pieces: Vec<Piece>,
+pub struct Piece {
+    position: InternalCooridates,
+    piece_type: PieceType,
+    color: Color,
 }
 
-type Offset = (isize, isize);
 
-const UP: Offset = (-1, 0);
-const DOWN: Offset = (1, 0);
-const LEFT: Offset = (0, -1);
-const RIGHT: Offset = (0, 1);
-
-const UP_LEFT: Offset = (-1, -1);
-const UP_RIGHT: Offset = (-1, 1);
-const DOWN_LEFT: Offset = (1, -1);
-const DOWN_RIGHT: Offset = (1, 1);
-
-enum Movement {
-    Walk(Offset),
-    Step(Vec<Offset>),
-    Jump(Vec<Offset>),
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Color {
+    Black,
+    White,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -47,34 +36,6 @@ impl PieceType {
         }
     }
 }
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Color {
-    Black,
-    White,
-}
-
-const ROOK_MOVEMENTS: &'static [Movement] = &[
-    Movement::Walk(UP),
-    Movement::Walk(LEFT),
-    Movement::Walk(RIGHT),
-    Movement::Walk(DOWN),
-];
-const KING_MOVEMENTS: &'static [Movement] = &[
-    Movement::Walk(UP),
-    Movement::Walk(LEFT),
-    Movement::Walk(RIGHT),
-    Movement::Walk(DOWN),
-];
-
-pub struct Piece {
-    position: InternalCooridates,
-    piece_type: PieceType,
-    color: Color,
-}
-
-type HumanCoordinates = (char, usize); // e.g. ('a',1) -> see doc folder
-type InternalCooridates = (usize, usize); // 0-indexed
 
 impl Piece {
     pub fn new(pos: HumanCoordinates, piece_type: PieceType, color: Color) -> Result<Self> {
@@ -157,73 +118,4 @@ pub fn get_startup_pieces_white() -> Result<Vec<Piece>> {
     pieces.extend(pawns);
 
     Ok(pieces)
-}
-
-pub fn num_to_char_notation(num: usize) -> Result<char> {
-    let mut code = num + 65;
-
-    if code >= 74 {
-        // skip J (74)
-        code += 1;
-    }
-    let c = char::from(u8::try_from(code)?);
-    Ok(c)
-}
-
-pub fn char_to_num_notation(y: char) -> Result<usize> {
-    // TODO: Check if coordinates are on board.
-
-    if !y.is_ascii() {
-        bail!("First item of position must be ascii")
-    }
-    let y = y.to_ascii_lowercase();
-
-    if y == 'j' {
-        bail!("Letter 'j' is not used!")
-    }
-
-    let mut y = y as usize; // a = 97
-    if !(97..=108).contains(&y) {
-        bail!("First item of position must be between 'a' and 'l'")
-    }
-
-    if y > 106 {
-        y -= 1; // skip J
-    }
-
-    y -= 97;
-    Ok(y)
-}
-
-fn to_human_coordinates((y, x): InternalCooridates) -> Result<HumanCoordinates> {
-    let c = num_to_char_notation(y)?;
-    Ok((c, x + 1))
-}
-
-fn to_internal_coordinates((y, x): HumanCoordinates) -> Result<InternalCooridates> {
-    let y = char_to_num_notation(y)?;
-    Ok((y, x - 1))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn to_human() {
-        let human = to_human_coordinates((1, 1)).unwrap();
-        assert_eq!(human, ('B', 2));
-
-        let human = to_human_coordinates((10, 5)).unwrap();
-        assert_eq!(human, ('L', 6));
-    }
-
-    #[test]
-    fn to_internal_skips_j() {
-        let internal = to_internal_coordinates(('K', 1)).unwrap();
-        assert_eq!(internal, (9, 0));
-
-        let internal = to_internal_coordinates(('L', 1)).unwrap();
-        assert_eq!(internal, (10, 0));
-    }
 }

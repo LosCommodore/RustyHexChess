@@ -2,7 +2,7 @@ mod display;
 mod game;
 use crate::{
     display::print_board,
-    game::{get_startup_pieces_black, get_startup_pieces_white},
+    game::piece::{get_startup_pieces_black, get_startup_pieces_white},
 };
 use anyhow::Result;
 
