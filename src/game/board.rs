@@ -1,6 +1,7 @@
 use std::todo;
 
 use super::piece::Piece;
+
 use crate::game::{
     coordinates::InternalCoordinates,
     movement::{MovementPattern, get_movement_patterns},
@@ -72,4 +73,30 @@ fn check_in_field(pos: InternalCoordinates) -> bool {
     let max_x = 10 - distance_to_middle;
 
     pos.1 < max_x
+}
+
+#[cfg(test)]
+mod tests {
+    use std::println;
+
+    use super::*;
+
+    use crate::game::piece::{Color, Piece, PieceType};
+
+    #[test]
+    fn test_move_rook() {
+        let mut board = Board { pieces: Vec::new() };
+        let pos = ('F', 5);
+        board
+            .pieces
+            .push(Piece::new(pos, PieceType::Rook, Color::Black).expect("wrong piece definition"));
+
+        let internal_pos = board.pieces[0].position();
+
+        let options = board
+            .get_movement_options(internal_pos)
+            .expect("error on movement options");
+
+        println!("{options:#?}");
+    }
 }
