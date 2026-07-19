@@ -1,7 +1,25 @@
 use anyhow::{Ok, Result, bail};
 
 pub type HumanCoordinates = (char, usize); // e.g. ('a',1) -> see doc folder
-pub type InternalCoordinates = (usize, usize); // 0-indexed
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Coordinates {
+    pub y: usize, // letters
+    pub x: usize,
+}
+
+impl Coordinates {
+    #[allow(unused)]
+    pub fn to_human_coordinates(&self) -> Result<HumanCoordinates> {
+        let c = num_to_char_notation(self.y)?;
+        Ok((c, self.x + 1))
+    }
+
+    pub fn from_human_coordinates((y, x): HumanCoordinates) -> Result<Self> {
+        let y = char_to_num_notation(y)?;
+        Ok(Self { y, x: x - 1 })
+    }
+}
 
 pub fn num_to_char_notation(num: usize) -> Result<char> {
     let mut code = num + 65;
@@ -39,36 +57,28 @@ pub fn char_to_num_notation(y: char) -> Result<usize> {
     Ok(y)
 }
 
-#[allow(unused)]
-pub fn to_human_coordinates((y, x): InternalCoordinates) -> Result<HumanCoordinates> {
-    let c = num_to_char_notation(y)?;
-    Ok((c, x + 1))
-}
-
-pub fn to_internal_coordinates((y, x): HumanCoordinates) -> Result<InternalCoordinates> {
-    let y = char_to_num_notation(y)?;
-    Ok((y, x - 1))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn to_human() {
-        let human = to_human_coordinates((1, 1)).unwrap();
+        let c = Coordinates { y: 1, x: 1 };
+        let human = c.to_human_coordinates().unwrap();
+
         assert_eq!(human, ('B', 2));
 
-        let human = to_human_coordinates((10, 5)).unwrap();
+        let c = Coordinates { y: 10, x: 5 };
+        let human = c.to_human_coordinates().unwrap();
         assert_eq!(human, ('L', 6));
     }
 
     #[test]
     fn to_internal_skips_j() {
-        let internal = to_internal_coordinates(('K', 1)).unwrap();
-        assert_eq!(internal, (9, 0));
+        let internal = Coordinates::from_human_coordinates(('K', 1)).unwrap();
+        assert_eq!(internal, Coordinates { y: 9, x: 0 });
 
-        let internal = to_internal_coordinates(('L', 1)).unwrap();
-        assert_eq!(internal, (10, 0));
+        let internal = Coordinates::from_human_coordinates(('L', 1)).unwrap();
+        assert_eq!(internal, Coordinates { y: 9, x: 0 });
     }
 }

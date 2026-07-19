@@ -1,3 +1,4 @@
+use crate::game::coordinates::Coordinates;
 use crate::game::coordinates::num_to_char_notation;
 use crate::game::piece::Color as PieceColor;
 use crate::game::piece::Piece;
@@ -42,7 +43,7 @@ pub fn print_board(pieces: &[Piece]) -> Result<()> {
 }
 
 fn print_cell(pieces: &[Piece], y: usize, x: usize, out: &mut impl Write) -> Result<()> {
-    let piece = pieces.iter().find(|p| p.position() == (y, x));
+    let piece = pieces.iter().find(|p| p.position() == Coordinates { y, x });
 
     let cell_color = match piece {
         Some(p) => match p.color() {
