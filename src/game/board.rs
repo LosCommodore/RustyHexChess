@@ -1,4 +1,4 @@
-use std::todo;
+use std::{collections::HashMap, todo};
 
 use super::piece::Piece;
 
@@ -8,12 +8,30 @@ use crate::game::{
 };
 use anyhow::{Result, bail};
 
-#[allow(unused)]
-struct Board {
+/*
+enum Marker {
+    MovementOption,
+}
+*/
+
+#[derive(Default)]
+pub struct Board {
     pieces: Vec<Piece>,
+    //markers: HashMap<Coordinates, Marker>,
 }
 
 impl Board {
+    pub fn new(pieces: Vec<Piece>) -> Self {
+        Self {
+            pieces,
+            ..Default::default()
+        }
+    }
+
+    pub fn pieces(&self) -> &Vec<Piece> {
+        &self.pieces
+    }
+
     #[allow(unused)]
     fn get_movement_options(&self, source: Coordinates) -> Result<Vec<Coordinates>> {
         let Some(me) = self.pieces.iter().find(|p| p.position() == source) else {
@@ -82,7 +100,7 @@ mod tests {
 
     #[test]
     fn test_move_rook() {
-        let mut board = Board { pieces: Vec::new() };
+        let mut board = Board::default();
         let pos = ('F', 5);
         board
             .pieces

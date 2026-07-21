@@ -1,45 +1,71 @@
+use crate::game::board::Board;
 use crate::game::coordinates::Coordinates;
 use crate::game::coordinates::num_to_char_notation;
 use crate::game::piece::Color as PieceColor;
 use crate::game::piece::Piece;
-
 use anyhow::Result;
 use crossterm::style::{Color, SetBackgroundColor, SetForegroundColor};
+use crossterm::terminal::disable_raw_mode;
+use crossterm::{
+    cursor::MoveTo,
+    terminal::{Clear, ClearType},
+};
 use crossterm::{cursor::MoveToNextLine, execute, style::Print};
+use crossterm::{cursor::Show, style::ResetColor};
 use std::io::{Write, stdout};
-
 const BOARD_DIM: usize = 11;
 const EDGE_LEN: usize = 6;
 const CELL_WIDTH: usize = 5;
 const INITIAL_X_OFFSET: isize = 20;
 
-pub fn print_board(pieces: &[Piece]) -> Result<()> {
-    let mut out = stdout();
+pub trait BoardDisplay {
+    fn display(&self, board: &Board) -> Result<()>;
+}
 
-    print_column_labels(&mut out)?;
+pub struct ChessTerminal;
 
-    let mut columns = EDGE_LEN;
-    let mut space_count = 0isize;
-    for y in 0..BOARD_DIM {
-        let inc: isize = if y < BOARD_DIM / 2 { 1 } else { -1 };
-
-        let nr_spaces = (INITIAL_X_OFFSET - space_count * 3) as usize;
-        let whitespace = " ".repeat(nr_spaces);
-        let char_notation = num_to_char_notation(y)?;
-        execute!(out, Print(whitespace), Print(format!("{char_notation}  ")))?;
-
-        for x in 0..columns {
-            print_cell(&pieces, y, x, &mut out)?;
-        }
-        print_diagonal_column_label(&mut out, y)?;
-        execute!(out, MoveToNextLine(1))?;
-
-        space_count += inc;
-        columns = (columns as isize + inc) as usize;
+impl ChessTerminal {
+    pub fn clc() -> Result<()> {
+        execute!(stdout(), Clear(ClearType::All), MoveTo(0, 0))?;
+        Ok(())
     }
+}
+impl Drop for ChessTerminal {
+    fn drop(&mut self) {
+        let _ = execute!(stdout(), ResetColor, Show);
+        let _ = disable_raw_mode();
+    }
+}
 
-    out.flush()?;
-    Ok(())
+impl BoardDisplay for ChessTerminal {
+    fn display(&self, board: &Board) -> Result<()> {
+        let mut out = stdout();
+
+        print_column_labels(&mut out)?;
+
+        let mut columns = EDGE_LEN;
+        let mut space_count = 0isize;
+        for y in 0..BOARD_DIM {
+            let inc: isize = if y < BOARD_DIM / 2 { 1 } else { -1 };
+
+            let nr_spaces = (INITIAL_X_OFFSET - space_count * 3) as usize;
+            let whitespace = " ".repeat(nr_spaces);
+            let char_notation = num_to_char_notation(y)?;
+            execute!(out, Print(whitespace), Print(format!("{char_notation}  ")))?;
+
+            for x in 0..columns {
+                print_cell(board.pieces(), y, x, &mut out)?;
+            }
+            print_diagonal_column_label(&mut out, y)?;
+            execute!(out, MoveToNextLine(1))?;
+
+            space_count += inc;
+            columns = (columns as isize + inc) as usize;
+        }
+
+        out.flush()?;
+        Ok(())
+    }
 }
 
 fn print_cell(pieces: &[Piece], y: usize, x: usize, out: &mut impl Write) -> Result<()> {

@@ -1,37 +1,25 @@
 mod display;
 mod game;
+
 use crate::{
-    display::print_board,
-    game::piece::{get_startup_pieces_black, get_startup_pieces_white},
+    display::{BoardDisplay, ChessTerminal},
+    game::{
+        board::Board,
+        piece::{get_startup_pieces_black, get_startup_pieces_white},
+    },
 };
 use anyhow::Result;
 
-use crossterm::{
-    cursor::{MoveTo, Show},
-    execute,
-    style::ResetColor,
-    terminal::{Clear, ClearType, disable_raw_mode},
-};
-use std::io::stdout;
-
-struct TerminalCleanup;
-
-impl Drop for TerminalCleanup {
-    fn drop(&mut self) {
-        let _ = execute!(stdout(), ResetColor, Show);
-        let _ = disable_raw_mode();
-    }
-}
-
 fn main() -> Result<()> {
-    let _cleanup = TerminalCleanup;
-
-    execute!(stdout(), Clear(ClearType::All), MoveTo(0, 0))?;
+    ChessTerminal::clc()?;
 
     //let _piece = Piece::new(('A', 1), game::PieceType::King, game::PlayerColor::Black)?;
     let mut pieces = get_startup_pieces_black()?;
     pieces.extend(get_startup_pieces_white()?);
+    let board = Board::new(pieces);
 
-    print_board(&pieces)?;
+    let terminal = ChessTerminal;
+    terminal.display(&board)?;
+
     Ok(())
 }
