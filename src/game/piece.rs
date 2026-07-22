@@ -2,7 +2,7 @@ use super::coordinates::*;
 use anyhow::{Ok, Result};
 
 pub struct Piece {
-    position: Coordinates,
+    position: Position,
     piece_type: PieceType,
     color: Color,
 }
@@ -38,7 +38,7 @@ impl PieceType {
 
 impl Piece {
     pub fn new(pos: HumanCoordinates, piece_type: PieceType, color: Color) -> Result<Self> {
-        let position = Coordinates::from_human_coordinates(pos)?;
+        let position = Position::from_human_coordinates(pos)?;
         Ok(Piece {
             position,
             piece_type,
@@ -46,7 +46,7 @@ impl Piece {
         })
     }
 
-    pub fn position(&self) -> Coordinates {
+    pub fn position(&self) -> Position {
         self.position
     }
 

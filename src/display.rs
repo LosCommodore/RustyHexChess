@@ -1,8 +1,7 @@
 use crate::game::board::Board;
-use crate::game::coordinates::Coordinates;
+use crate::game::board::Marker;
+use crate::game::coordinates::Position;
 use crate::game::coordinates::num_to_char_notation;
-use crate::game::piece::Color as PieceColor;
-use crate::game::piece::Piece;
 use anyhow::Result;
 use crossterm::style::{Color, SetBackgroundColor, SetForegroundColor};
 use crossterm::terminal::disable_raw_mode;
@@ -13,6 +12,9 @@ use crossterm::{
 use crossterm::{cursor::MoveToNextLine, execute, style::Print};
 use crossterm::{cursor::Show, style::ResetColor};
 use std::io::{Write, stdout};
+use crate::game::piece::Color as PieceColor;
+
+
 const BOARD_DIM: usize = 11;
 const EDGE_LEN: usize = 6;
 const CELL_WIDTH: usize = 5;
@@ -54,7 +56,9 @@ impl BoardDisplay for ChessTerminal {
             execute!(out, Print(whitespace), Print(format!("{char_notation}  ")))?;
 
             for x in 0..columns {
-                print_cell(board.pieces(), y, x, &mut out)?;
+                let pos = Position{y,x};
+                print_cell(board, pos, &mut out)?;
+
             }
             print_diagonal_column_label(&mut out, y)?;
             execute!(out, MoveToNextLine(1))?;
@@ -68,16 +72,17 @@ impl BoardDisplay for ChessTerminal {
     }
 }
 
-fn print_cell(pieces: &[Piece], y: usize, x: usize, out: &mut impl Write) -> Result<()> {
-    let piece = pieces.iter().find(|p| p.position() == Coordinates { y, x });
+fn print_cell(board: &Board, pos: Position, out: &mut impl Write) -> Result<()> {
+    let piece = board.pieces().iter().find(|p| p.position() == pos);
 
-    let cell_color = match piece {
+    
+    let foreground_color = match piece {
         Some(p) => match p.color() {
             PieceColor::Black => Color::Blue,
             PieceColor::White => Color::Red,
         },
         None => Color::Reset,
-    };
+    };    
 
     let symbol = match piece {
         Some(x) => x.piece_type().symbol(),
@@ -86,12 +91,22 @@ fn print_cell(pieces: &[Piece], y: usize, x: usize, out: &mut impl Write) -> Res
 
     let symbol: String = format!("[ {symbol} ]");
 
+
+    let cell_color = board
+    .markers
+    .get(&pos)
+    .map_or(Color::Reset, |marker| match marker {
+        Marker::MovementOption => Color::DarkYellow,
+    });
+
+
     execute!(
         out,
         SetBackgroundColor(cell_color),
+        SetForegroundColor(foreground_color),
         Print(&symbol),
-        SetForegroundColor(Color::White),
         SetBackgroundColor(Color::Reset),
+        SetForegroundColor(Color::Reset),
     )?;
     Ok(())
 }

@@ -2,13 +2,13 @@ use anyhow::{Ok, Result, bail};
 
 pub type HumanCoordinates = (char, usize); // e.g. ('a',1) -> see doc folder
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Coordinates {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Position {
     pub y: usize, // letters
     pub x: usize,
 }
 
-impl Coordinates {
+impl Position {
     #[allow(unused)]
     pub fn to_human_coordinates(&self) -> Result<HumanCoordinates> {
         let c = num_to_char_notation(self.y)?;
@@ -63,22 +63,22 @@ mod tests {
 
     #[test]
     fn to_human() {
-        let c = Coordinates { y: 1, x: 1 };
+        let c = Position { y: 1, x: 1 };
         let human = c.to_human_coordinates().unwrap();
 
         assert_eq!(human, ('B', 2));
 
-        let c = Coordinates { y: 10, x: 5 };
+        let c = Position { y: 10, x: 5 };
         let human = c.to_human_coordinates().unwrap();
         assert_eq!(human, ('L', 6));
     }
 
     #[test]
     fn to_internal_skips_j() {
-        let internal = Coordinates::from_human_coordinates(('K', 1)).unwrap();
-        assert_eq!(internal, Coordinates { y: 9, x: 0 });
+        let internal = Position::from_human_coordinates(('K', 1)).unwrap();
+        assert_eq!(internal, Position { y: 9, x: 0 });
 
-        let internal = Coordinates::from_human_coordinates(('L', 1)).unwrap();
-        assert_eq!(internal, Coordinates { y: 9, x: 0 });
+        let internal = Position::from_human_coordinates(('L', 1)).unwrap();
+        assert_eq!(internal, Position { y: 9, x: 0 });
     }
 }

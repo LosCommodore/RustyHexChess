@@ -3,21 +3,21 @@ use std::{collections::HashMap, todo};
 use super::piece::Piece;
 
 use crate::game::{
-    coordinates::Coordinates,
+    coordinates::Position,
     movement::{MovementPattern, get_movement_patterns},
 };
 use anyhow::{Result, bail};
 
-/*
-enum Marker {
+
+#[allow(unused)]
+pub enum Marker {
     MovementOption,
 }
-*/
 
 #[derive(Default)]
 pub struct Board {
     pieces: Vec<Piece>,
-    //markers: HashMap<Coordinates, Marker>,
+    pub markers: HashMap<Position, Marker>,
 }
 
 impl Board {
@@ -32,13 +32,14 @@ impl Board {
         &self.pieces
     }
 
+
     #[allow(unused)]
-    fn get_movement_options(&self, source: Coordinates) -> Result<Vec<Coordinates>> {
+    fn get_movement_options(&self, source: Position) -> Result<Vec<Position>> {
         let Some(me) = self.pieces.iter().find(|p| p.position() == source) else {
             bail!("No piece on this coordinate");
         };
 
-        let mut options: Vec<Coordinates> = Vec::new();
+        let mut options: Vec<Position> = Vec::new();
         for p in get_movement_patterns(me.piece_type()) {
             match p {
                 MovementPattern::Walk(offset) => {
@@ -51,7 +52,7 @@ impl Board {
     }
 }
 
-fn do_walk(me: &Piece, offset: (isize, isize), pieces: &Vec<Piece>) -> Vec<Coordinates> {
+fn do_walk(me: &Piece, offset: (isize, isize), pieces: &Vec<Piece>) -> Vec<Position> {
     let mut options = Vec::new();
     let mut pos = me.position();
     loop {
@@ -80,7 +81,7 @@ fn do_walk(me: &Piece, offset: (isize, isize), pieces: &Vec<Piece>) -> Vec<Coord
     }
 }
 
-fn check_in_field(pos: Coordinates) -> bool {
+fn check_in_field(pos: Position) -> bool {
     if pos.y > 10 {
         return false;
     }
