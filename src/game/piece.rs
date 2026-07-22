@@ -37,8 +37,7 @@ impl PieceType {
 }
 
 impl Piece {
-    pub fn new(pos: HumanCoordinates, piece_type: PieceType, color: Color) -> Result<Self> {
-        let position = Position::from_human_coordinates(pos)?;
+    pub fn new(position: Position, piece_type: PieceType, color: Color) -> Result<Self> {
         Ok(Piece {
             position,
             piece_type,
@@ -61,22 +60,22 @@ impl Piece {
 
 pub fn get_startup_pieces_black() -> Result<Vec<Piece>> {
     let color = Color::Black;
-
+    let human = Position::from_human;
     let mut pieces = vec![
-        Piece::new(('E', 10), PieceType::King, color)?,
-        Piece::new(('G', 10), PieceType::Queen, color)?,
-        Piece::new(('F', 11), PieceType::Bishop, color)?,
-        Piece::new(('F', 10), PieceType::Bishop, color)?,
-        Piece::new(('F', 9), PieceType::Bishop, color)?,
-        Piece::new(('D', 9), PieceType::Knight, color)?,
-        Piece::new(('H', 9), PieceType::Knight, color)?,
-        Piece::new(('C', 8), PieceType::Rook, color)?,
-        Piece::new(('I', 8), PieceType::Rook, color)?,
+        Piece::new(human(('E', 10))?, PieceType::King, color)?,
+        Piece::new(human(('G', 10))?, PieceType::Queen, color)?,
+        Piece::new(human(('F', 11))?, PieceType::Bishop, color)?,
+        Piece::new(human(('F', 10))?, PieceType::Bishop, color)?,
+        Piece::new(human(('F', 9))?, PieceType::Bishop, color)?,
+        Piece::new(human(('D', 9))?, PieceType::Knight, color)?,
+        Piece::new(human(('H', 9))?, PieceType::Knight, color)?,
+        Piece::new(human(('C', 8))?, PieceType::Rook, color)?,
+        Piece::new(human(('I', 8))?, PieceType::Rook, color)?,
     ];
 
     let pawns: Vec<Piece> = ['b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'k']
         .into_iter()
-        .map(|i| Piece::new((i, 7), PieceType::Pawn, color))
+        .map(|i| Piece::new(human((i, 7))?, PieceType::Pawn, color))
         .collect::<Result<_, _>>()?;
 
     pieces.extend(pawns);
@@ -86,17 +85,18 @@ pub fn get_startup_pieces_black() -> Result<Vec<Piece>> {
 
 pub fn get_startup_pieces_white() -> Result<Vec<Piece>> {
     let color = Color::White;
+    let human = Position::from_human;
 
     let mut pieces = vec![
-        Piece::new(('E', 1), PieceType::King, color)?,
-        Piece::new(('G', 1), PieceType::Queen, color)?,
-        Piece::new(('F', 1), PieceType::Bishop, color)?,
-        Piece::new(('F', 2), PieceType::Bishop, color)?,
-        Piece::new(('F', 3), PieceType::Bishop, color)?,
-        Piece::new(('D', 1), PieceType::Knight, color)?,
-        Piece::new(('H', 1), PieceType::Knight, color)?,
-        Piece::new(('C', 1), PieceType::Rook, color)?,
-        Piece::new(('I', 1), PieceType::Rook, color)?,
+        Piece::new(human(('E', 1))?, PieceType::King, color)?,
+        Piece::new(human(('G', 1))?, PieceType::Queen, color)?,
+        Piece::new(human(('F', 1))?, PieceType::Bishop, color)?,
+        Piece::new(human(('F', 2))?, PieceType::Bishop, color)?,
+        Piece::new(human(('F', 3))?, PieceType::Bishop, color)?,
+        Piece::new(human(('D', 1))?, PieceType::Knight, color)?,
+        Piece::new(human(('H', 1))?, PieceType::Knight, color)?,
+        Piece::new(human(('C', 1))?, PieceType::Rook, color)?,
+        Piece::new(human(('I', 1))?, PieceType::Rook, color)?,
     ];
 
     let pawns: Vec<Piece> = [
@@ -111,7 +111,7 @@ pub fn get_startup_pieces_white() -> Result<Vec<Piece>> {
         ('k', 1),
     ]
     .into_iter()
-    .map(|pos| Piece::new(pos, PieceType::Pawn, color))
+    .map(|pos| Piece::new(human(pos)?, PieceType::Pawn, color))
     .collect::<Result<_, _>>()?;
 
     pieces.extend(pawns);

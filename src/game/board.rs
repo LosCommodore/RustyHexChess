@@ -34,7 +34,7 @@ impl Board {
 
 
     #[allow(unused)]
-    fn get_movement_options(&self, source: Position) -> Result<Vec<Position>> {
+    pub fn get_movement_options(&self, source: Position) -> Result<Vec<Position>> {
         let Some(me) = self.pieces.iter().find(|p| p.position() == source) else {
             bail!("No piece on this coordinate");
         };
@@ -56,10 +56,10 @@ fn do_walk(me: &Piece, offset: (isize, isize), pieces: &Vec<Piece>) -> Vec<Posit
     let mut options = Vec::new();
     let mut pos = me.position();
     loop {
-        let Some(x) = pos.y.checked_add_signed(offset.0) else {
+        let Some(y) = pos.y.checked_add_signed(offset.0) else {
             return options;
         };
-        pos.x = x;
+        pos.y = y;
 
         let Some(x) = pos.x.checked_add_signed(offset.1) else {
             return options;
@@ -102,7 +102,7 @@ mod tests {
     #[test]
     fn test_move_rook() {
         let mut board = Board::default();
-        let pos = ('F', 5);
+        let pos = Position::from_human(('F', 5)).expect("invalid position");
         board
             .pieces
             .push(Piece::new(pos, PieceType::Rook, Color::Black).expect("wrong piece definition"));

@@ -3,17 +3,15 @@
 use crate::game::piece::PieceType;
 type Offset = (isize, isize);
 
-/*
-const UP_LEFT: Offset = (-1, -1);
-const UP_RIGHT: Offset = (-1, 1);
-const DOWN_LEFT: Offset = (1, -1);
-const DOWN_RIGHT: Offset = (1, 1);
- */
-
 const UP: Offset = (-1, 0);
 const DOWN: Offset = (1, 0);
 const LEFT: Offset = (0, -1);
 const RIGHT: Offset = (0, 1);
+const UP_LEFT: Offset = (-1, -1);
+const UP_RIGHT: Offset = (-1, 1);
+const DOWN_LEFT: Offset = (1, -1);
+const DOWN_RIGHT: Offset = (1, 1);
+
 
 #[derive(Clone)]
 pub enum MovementPattern {
@@ -24,10 +22,12 @@ pub enum MovementPattern {
 
 #[allow(unused)]
 const ROOK_MOVEMENTS: &'static [MovementPattern] = &[
-    MovementPattern::Walk(UP),
+    MovementPattern::Walk(UP_LEFT),
+    MovementPattern::Walk(UP_RIGHT),
+    MovementPattern::Walk(DOWN_LEFT),
+    MovementPattern::Walk(DOWN_RIGHT),
     MovementPattern::Walk(LEFT),
     MovementPattern::Walk(RIGHT),
-    MovementPattern::Walk(DOWN),
 ];
 
 const KING_MOVEMENTS: &'static [MovementPattern] = &[
