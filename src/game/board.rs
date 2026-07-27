@@ -29,50 +29,66 @@ impl Board {
         for p in get_movement_patterns(me.piece_type()) {
             match p {
                 MovementPattern::Walk(offset) => {
-                    options.extend(do_walk(me, pos,*offset, &self.pieces));
+                    options.extend(self.do_walk(me, pos, *offset));
+                }
+                MovementPattern::Step(steps) => {
+                    options.extend(self.do_step(me, pos, *steps));
                 }
                 _ => todo!(),
             }
         }
         Ok(options)
     }
-}
 
-fn do_walk(me: &Piece, mut pos: Position, offset: (isize, isize), pieces: &HashMap<Position, Piece>) -> Vec<Position> {
-    let mut options = Vec::new();
-    loop {
-        let Some(y) = pos.y.checked_add_signed(offset.0) else {
-            return options;
+    pub fn is_movement_option(
+        &self,
+        pos: &Position,
+        me: &Piece,
+        dy: isize,
+        dx: isize,
+    ) -> Option<Position> {
+        let Some(y) = pos.y.checked_add_signed(dy) else {
+            return None;
         };
-        pos.y = y;
-
-        let Some(x) = pos.x.checked_add_signed(offset.1) else {
-            return options;
+        let Some(x) = pos.x.checked_add_signed(dx) else {
+            return None;
         };
-        pos.x = x;
 
-        if !check_in_field(pos) {
-            return options;
+        let pos = Position { y, x };
+        if !pos.is_in_field() {
+            return None;
         }
 
-        if let Some(piece) = pieces.get(&pos) {
+        if let Some(piece) = self.pieces.get(&pos) {
             if piece.color() == me.color() {
-                options.push(pos);
+                return None;
             }
-            return options;
+        }
+        Some(pos)
+    }
+
+    fn do_step(&self, me: &Piece, pos: Position, steps: &[(isize, isize)]) -> Vec<Position> {
+        let mut options = Vec::new();
+
+        for (dy, dx) in steps {
+            if let Some(new_pos) = self.is_movement_option(&pos, me, *dy, *dx) {
+                options.push(new_pos);
+            }
         }
 
-        options.push(pos);
+        options
     }
-}
 
-fn check_in_field(Position { y, x }: Position) -> bool {
-    if y > 10 {
-        return false;
+    fn do_walk(&self, me: &Piece, mut pos: Position, (dy, dx): (isize, isize)) -> Vec<Position> {
+        let mut options = Vec::new();
+        loop {
+            let Some(new_pos) = self.is_movement_option(&pos, me, dy, dx) else {
+                return options;
+            };
+            options.push(new_pos);
+            pos = new_pos;
+        }
     }
-    let x_range = X_RANGE[y];
-
-    x >= x_range.0 && x <= x_range.1
 }
 
 #[cfg(test)]
@@ -87,12 +103,13 @@ mod tests {
     fn test_move_rook() {
         let mut board = Board::default();
         let pos = Position::try_from(('F', 5)).expect("invalid position");
-        let piece = Piece{piece_type: PieceType::Rook, color: Color::Black};
-        board
-            .pieces
-            .insert(pos, piece);
+        let piece = Piece {
+            piece_type: PieceType::Rook,
+            color: Color::Black,
+        };
+        board.pieces.insert(pos, piece);
 
-        let internal_pos =pos;
+        let internal_pos = pos;
 
         let options = board
             .get_movement_options(internal_pos)

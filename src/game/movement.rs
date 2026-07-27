@@ -3,7 +3,7 @@
 use crate::game::piece::PieceType;
 type Offset = (isize, isize);
 
-// Name of Directions like in the pictures from:  doc/cooridnaten.drawio (first picture)
+// Name of Directions like in the pictures from:  doc/coordinates.drawio (first picture)
 
 // Main axis:
 const UP: Offset = (0, -1);
@@ -20,8 +20,8 @@ const DOWN_LEFT: Offset = (-1, 0);
 #[derive(Clone)]
 pub enum MovementPattern {
     Walk(Offset),
-    Step(Vec<Offset>),
-    Jump(Vec<Offset>),
+    Step(&'static [Offset]),
+    Jump(&'static [Offset]),
 }
 
 #[allow(unused)]
@@ -34,12 +34,9 @@ const ROOK_MOVEMENTS: &'static [MovementPattern] = &[
     MovementPattern::Walk(DOWN_LEFT),
 ];
 
-const KING_MOVEMENTS: &'static [MovementPattern] = &[
-    MovementPattern::Walk(UP),
-    //MovementPattern::Walk(LEFT),
-    //MovementPattern::Walk(RIGHT),
-    //MovementPattern::Walk(DOWN),
-];
+const KING_MOVEMENTS: &'static [MovementPattern] = &[MovementPattern::Step(&[
+    UP, DOWN, UP_LEFT, DOWN_RIGHT, UP_RIGHT, DOWN_LEFT,
+])];
 
 pub fn get_movement_patterns(piece_type: PieceType) -> &'static [MovementPattern] {
     use PieceType::*;
