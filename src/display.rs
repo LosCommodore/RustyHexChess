@@ -71,7 +71,7 @@ impl BoardDisplay for ChessTerminal {
 }
 
 fn print_cell(board: &Board, pos: Position, out: &mut impl Write) -> Result<()> {
-    let piece = board.pieces().iter().find(|p| p.position() == pos);
+    let piece = board.pieces.get(&pos);
 
     let foreground_color = match piece {
         Some(p) => match p.color() {

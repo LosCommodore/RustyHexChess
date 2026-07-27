@@ -1,4 +1,4 @@
-use std::{collections::HashMap, todo};
+use std::{collections::HashMap, fmt::Pointer, todo};
 
 use super::piece::Piece;
 
@@ -15,25 +15,13 @@ pub enum Marker {
 
 #[derive(Default)]
 pub struct Board {
-    pieces: Vec<Piece>,
+    pub pieces: HashMap<Position, Piece>,
     pub markers: HashMap<Position, Marker>,
 }
 
 impl Board {
-    pub fn new(pieces: Vec<Piece>) -> Self {
-        Self {
-            pieces,
-            ..Default::default()
-        }
-    }
-
-    pub fn pieces(&self) -> &Vec<Piece> {
-        &self.pieces
-    }
-
-    #[allow(unused)]
-    pub fn get_movement_options(&self, source: Position) -> Result<Vec<Position>> {
-        let Some(me) = self.pieces.iter().find(|p| p.position() == source) else {
+    pub fn get_movement_options(&self, pos: Position) -> Result<Vec<Position>> {
+        let Some(me) = self.pieces.get(&pos) else {
             bail!("No piece on this coordinate");
         };
 
@@ -41,7 +29,7 @@ impl Board {
         for p in get_movement_patterns(me.piece_type()) {
             match p {
                 MovementPattern::Walk(offset) => {
-                    options.extend(do_walk(me, *offset, &self.pieces));
+                    options.extend(do_walk(me, pos,*offset, &self.pieces));
                 }
                 _ => todo!(),
             }
@@ -50,9 +38,8 @@ impl Board {
     }
 }
 
-fn do_walk(me: &Piece, offset: (isize, isize), pieces: &Vec<Piece>) -> Vec<Position> {
+fn do_walk(me: &Piece, mut pos: Position, offset: (isize, isize), pieces: &HashMap<Position, Piece>) -> Vec<Position> {
     let mut options = Vec::new();
-    let mut pos = me.position();
     loop {
         let Some(y) = pos.y.checked_add_signed(offset.0) else {
             return options;
@@ -68,7 +55,7 @@ fn do_walk(me: &Piece, offset: (isize, isize), pieces: &Vec<Piece>) -> Vec<Posit
             return options;
         }
 
-        if let Some(piece) = pieces.iter().find(|p| p.position() == pos) {
+        if let Some(piece) = pieces.get(&pos) {
             if piece.color() == me.color() {
                 options.push(pos);
             }
@@ -94,17 +81,18 @@ mod tests {
 
     use super::*;
 
-    use crate::game::piece::{Color, Piece, PieceType};
+    use crate::game::piece::{self, Color, Piece, PieceType};
 
     #[test]
     fn test_move_rook() {
         let mut board = Board::default();
         let pos = Position::try_from(('F', 5)).expect("invalid position");
+        let piece = Piece{piece_type: PieceType::Rook, color: Color::Black};
         board
             .pieces
-            .push(Piece::new(pos, PieceType::Rook, Color::Black).expect("wrong piece definition"));
+            .insert(pos, piece);
 
-        let internal_pos = board.pieces[0].position();
+        let internal_pos =pos;
 
         let options = board
             .get_movement_options(internal_pos)

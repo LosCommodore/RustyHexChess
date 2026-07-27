@@ -17,15 +17,14 @@ fn main() -> Result<()> {
     ChessTerminal::clc()?;
 
     //let _piece = Piece::new(('A', 1), game::PieceType::King, game::PlayerColor::Black)?;
-    let mut pieces = Vec::new();
     let rook_pos = Position::try_from(('F', 6))?;
     //let rook_pos = Position::try_from(('F',11))?;
-    let rook = Piece::new(rook_pos, PieceType::Rook, Color::Black)?;
-    pieces.push(rook);
+    let rook = Piece{piece_type: PieceType::Rook, color: Color::Black};
 
     //pieces.extend(get_startup_pieces_black()?);
     //pieces.extend(get_startup_pieces_white()?);
-    let mut board = Board::new(pieces);
+    let mut board = Board::default();
+    board.pieces.insert(rook_pos, rook);
 
     /*
     board.markers.insert(Position{y:5,x:5}, Marker::MovementOption);
