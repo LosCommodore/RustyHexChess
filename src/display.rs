@@ -41,9 +41,9 @@ impl Drop for ChessTerminal {
 
 impl BoardDisplay for ChessTerminal {
     fn display(&self, board: &Board) -> Result<()> {
+        let x_range = [6..=11, 5..=11,4..=11,3..=11,2..=11,1..=11,1..=10,1..=9,1..=8,1..=7,1..=6];
+        
         let mut out = stdout();
-
-        print_column_labels(&mut out)?;
 
         let mut columns = EDGE_LEN;
         let mut space_count = 0isize;
@@ -55,7 +55,7 @@ impl BoardDisplay for ChessTerminal {
             let char_notation = num_to_char_notation(y)?;
             execute!(out, Print(whitespace), Print(format!("{char_notation}  ")))?;
 
-            for x in 0..columns {
+            for x in x_range[y].clone() {
                 let pos = Position{y,x};
                 print_cell(board, pos, &mut out)?;
 
@@ -66,6 +66,8 @@ impl BoardDisplay for ChessTerminal {
             space_count += inc;
             columns = (columns as isize + inc) as usize;
         }
+
+        print_bottom_column_labels(&mut out)?;
 
         out.flush()?;
         Ok(())
@@ -111,9 +113,16 @@ fn print_cell(board: &Board, pos: Position, out: &mut impl Write) -> Result<()> 
     Ok(())
 }
 
-fn print_column_labels(out: &mut impl Write) -> Result<()> {
+fn print_bottom_column_labels(out: &mut impl Write) -> Result<()> {
     let board_start = INITIAL_X_OFFSET as usize + 3;
     let padding = " ".repeat(board_start);
+
+    execute!(out, Print(&padding))?;
+    for _ in 0..EDGE_LEN {
+        execute!(out, Print(format!("{:^width$}", "\\", width = CELL_WIDTH)))?;
+    }
+    execute!(out, Print(format!(" {}", EDGE_LEN + 1)))?;
+    execute!(out, MoveToNextLine(1))?;
 
     execute!(out, Print(&padding))?;
     for x in 1..=EDGE_LEN {
@@ -121,24 +130,17 @@ fn print_column_labels(out: &mut impl Write) -> Result<()> {
     }
     execute!(out, MoveToNextLine(1))?;
 
-    execute!(out, Print(&padding))?;
-    for _ in 0..EDGE_LEN {
-        execute!(out, Print(format!("{:^width$}", "/", width = CELL_WIDTH)))?;
-    }
-    execute!(out, Print(format!(" {}", EDGE_LEN + 1)))?;
-    execute!(out, MoveToNextLine(1))?;
-
     Ok(())
 }
 
 fn print_diagonal_column_label(out: &mut impl Write, y: usize) -> Result<()> {
-    if y >= EDGE_LEN - 1 {
+    if y < EDGE_LEN {
         return Ok(());
     }
 
-    execute!(out, Print(" /"))?;
-    if y < EDGE_LEN - 2 {
-        execute!(out, Print(format!(" {}", EDGE_LEN + y + 2)))?;
+    execute!(out, Print(" \\"))?;
+    if y > EDGE_LEN {
+        execute!(out, Print(format!("  {}", BOARD_DIM - (y - EDGE_LEN) + 1)))?;
     }
 
     Ok(())
