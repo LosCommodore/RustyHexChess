@@ -18,12 +18,12 @@ fn main() -> Result<()> {
 
     let mut board = Board::default();
 
-    let rook_pos = Position::try_from(('F', 6))?;
-    let rook = Piece {
-        piece_type: PieceType::Rook,
+    let piece_pos = Position::try_from(('D', 6))?;
+    let piece = Piece {
+        piece_type: PieceType::Bishop,
         color: Color::Black,
     };
-    board.pieces.insert(rook_pos, rook);
+    board.pieces.insert(piece_pos, piece);
 
     let king_pos = Position::try_from(('H', 6))?;
     let king = Piece {
@@ -32,7 +32,7 @@ fn main() -> Result<()> {
     };
     board.pieces.insert(king_pos, king);
 
-    let options = board.get_movement_options(rook_pos)?;
+    let options = board.get_movement_options(piece_pos)?;
 
     for p in options {
         board.markers.insert(p, Marker::MovementOption);
