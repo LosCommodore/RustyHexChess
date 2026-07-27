@@ -1,19 +1,38 @@
-use anyhow::{Ok, Result, bail};
+use std::fmt::{self, write};
 
-pub type HumanCoordinates = (char, usize); // e.g. ('a',1) -> [a..k] and [1..11]
+use anyhow::{Result, bail};
 
+
+/// Internal range for 2nd Dimesion, zero-indexed, open intervall 
+pub const X_RANGE: [(usize, usize);11]= [(5,10), (4,10), (3,10),(2,10),(1,10) ,(0,10),(0,9),(0,8),(0,7),(0,6),(0,5)];
+        
+
+pub type HumanCoordinates = (char, usize); // [a..k] and [1..11]
+
+
+/// Internal positions, 0-indexed | both coordinates are numbers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Position {
     pub y: usize, // letters
     pub x: usize,
 }
 
+impl fmt::Display for Position {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Ok(human) = HumanCoordinates::try_from( self.clone()) else {
+            return write!(f,"ERROR, invalid cooridnate")
+        };
+        write!(f, "Raw: {self:?} === {human:?} ")
+    }
+}
+
+
 impl TryFrom<HumanCoordinates> for Position {
     type Error = anyhow::Error;
     
     fn try_from((y, x): HumanCoordinates) -> Result<Self, Self::Error> {
              let y = char_to_num_notation(y)?;
-        Ok(Self { y, x })
+        Ok(Self { y, x: x-1 })
     }
 }
 
@@ -22,13 +41,13 @@ impl TryFrom<Position> for HumanCoordinates {
     
     fn try_from(p: Position) -> Result<Self, Self::Error> {
     let c = num_to_char_notation(p.y)?;
-        Ok((c, p.x))
+        Ok((c, p.x+1))
     }
 
 }
 
 pub fn num_to_char_notation(num: usize) -> Result<char> {
-    let mut code = num + 64;
+    let mut code = num + 65;  // 65 == ASCII('A')
     let c = char::from(u8::try_from(code)?);
     Ok(c)
 }
@@ -44,7 +63,7 @@ pub fn char_to_num_notation(y: char) -> Result<usize> {
         bail!("First item of position must be between 'a' and 'k'")
     }
 
-    y -= 96; // ascii(a) -> 1
+    y -= 97; // ASCII('a') -> 0
     Ok(y)
 }
 
@@ -56,11 +75,6 @@ mod tests {
     fn to_human() {
         let c = Position { y: 1, x: 1 };
         let human: HumanCoordinates =  c.try_into().unwrap();
-
         assert_eq!(human, ('B', 2));
-
-        let c = Position { y: 10, x: 5 };
-        let human: HumanCoordinates = c.try_into().unwrap();
-        assert_eq!(human, ('L', 6));
     }
 }

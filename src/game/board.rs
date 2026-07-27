@@ -3,11 +3,10 @@ use std::{collections::HashMap, todo};
 use super::piece::Piece;
 
 use crate::game::{
-    coordinates::Position,
+    coordinates::{Position, X_RANGE},
     movement::{MovementPattern, get_movement_patterns},
 };
 use anyhow::{Result, bail};
-
 
 #[allow(unused)]
 pub enum Marker {
@@ -31,7 +30,6 @@ impl Board {
     pub fn pieces(&self) -> &Vec<Piece> {
         &self.pieces
     }
-
 
     #[allow(unused)]
     pub fn get_movement_options(&self, source: Position) -> Result<Vec<Position>> {
@@ -81,14 +79,13 @@ fn do_walk(me: &Piece, offset: (isize, isize), pieces: &Vec<Piece>) -> Vec<Posit
     }
 }
 
-fn check_in_field(pos: Position) -> bool {
-    if pos.y > 10 {
+fn check_in_field(Position { y, x }: Position) -> bool {
+    if y > 10 {
         return false;
     }
-    let distance_to_middle = 5usize.abs_diff(pos.y);
-    let max_x = 10 - distance_to_middle;
+    let x_range = X_RANGE[y];
 
-    pos.x < max_x
+    x >= x_range.0 && x <= x_range.1
 }
 
 #[cfg(test)]

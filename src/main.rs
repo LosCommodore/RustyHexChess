@@ -4,8 +4,11 @@ mod display;
 mod game;
 
 use crate::{
-    display::{BoardDisplay, ChessTerminal}, game::{
-        board::{Board, Marker}, coordinates::Position, piece::{Color, Piece, PieceType, get_startup_pieces_black, get_startup_pieces_white},
+    display::{BoardDisplay, ChessTerminal},
+    game::{
+        board::{Board, Marker},
+        coordinates::Position,
+        piece::{Color, Piece, PieceType, get_startup_pieces_black, get_startup_pieces_white},
     },
 };
 use anyhow::Result;
@@ -15,7 +18,8 @@ fn main() -> Result<()> {
 
     //let _piece = Piece::new(('A', 1), game::PieceType::King, game::PlayerColor::Black)?;
     let mut pieces = Vec::new();
-    let rook_pos = Position::try_from(('F',6))?;
+    let rook_pos = Position::try_from(('F', 6))?;
+    //let rook_pos = Position::try_from(('F',11))?;
     let rook = Piece::new(rook_pos, PieceType::Rook, Color::Black)?;
     pieces.push(rook);
 
@@ -28,12 +32,12 @@ fn main() -> Result<()> {
     board.markers.insert(Position{y:5,x:4}, Marker::MovementOption);
     board.markers.insert(Position{y:5,x:6}, Marker::MovementOption);
     */
-    
+
     let options = board.get_movement_options(rook_pos)?;
     for p in options {
-       board.markers.insert(p, Marker::MovementOption);
+        board.markers.insert(p, Marker::MovementOption);
     }
-    
+
     let terminal = ChessTerminal;
     terminal.display(&board)?;
 

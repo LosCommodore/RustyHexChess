@@ -1,7 +1,7 @@
 use crate::game::board::Board;
 use crate::game::board::Marker;
-use crate::game::coordinates::Position;
-use crate::game::coordinates::num_to_char_notation;
+use crate::game::coordinates::{Position, X_RANGE, num_to_char_notation};
+use crate::game::piece::Color as PieceColor;
 use anyhow::Result;
 use crossterm::style::{Color, SetBackgroundColor, SetForegroundColor};
 use crossterm::terminal::disable_raw_mode;
@@ -12,8 +12,6 @@ use crossterm::{
 use crossterm::{cursor::MoveToNextLine, execute, style::Print};
 use crossterm::{cursor::Show, style::ResetColor};
 use std::io::{Write, stdout};
-use crate::game::piece::Color as PieceColor;
-
 
 const BOARD_DIM: usize = 11;
 const EDGE_LEN: usize = 6;
@@ -41,8 +39,6 @@ impl Drop for ChessTerminal {
 
 impl BoardDisplay for ChessTerminal {
     fn display(&self, board: &Board) -> Result<()> {
-        let x_range = [6..=11, 5..=11,4..=11,3..=11,2..=11,1..=11,1..=10,1..=9,1..=8,1..=7,1..=6];
-        
         let mut out = stdout();
 
         let mut columns = EDGE_LEN;
@@ -52,13 +48,13 @@ impl BoardDisplay for ChessTerminal {
 
             let nr_spaces = (INITIAL_X_OFFSET - space_count * 3) as usize;
             let whitespace = " ".repeat(nr_spaces);
-            let char_notation = num_to_char_notation(y+1)?;
+            let char_notation = num_to_char_notation(y)?;
             execute!(out, Print(whitespace), Print(format!("{char_notation}  ")))?;
 
-            for x in x_range[y].clone() {
-                let pos = Position{y: y+1,x};
+            let x_range = X_RANGE[y];
+            for x in x_range.0..=x_range.1 {
+                let pos = Position { y: y, x };
                 print_cell(board, pos, &mut out)?;
-
             }
             print_diagonal_column_label(&mut out, y)?;
             execute!(out, MoveToNextLine(1))?;
@@ -77,14 +73,13 @@ impl BoardDisplay for ChessTerminal {
 fn print_cell(board: &Board, pos: Position, out: &mut impl Write) -> Result<()> {
     let piece = board.pieces().iter().find(|p| p.position() == pos);
 
-    
     let foreground_color = match piece {
         Some(p) => match p.color() {
             PieceColor::Black => Color::Blue,
             PieceColor::White => Color::Red,
         },
         None => Color::Reset,
-    };    
+    };
 
     let symbol = match piece {
         Some(x) => x.piece_type().symbol(),
@@ -93,14 +88,12 @@ fn print_cell(board: &Board, pos: Position, out: &mut impl Write) -> Result<()> 
 
     let symbol: String = format!("[ {symbol} ]");
 
-
     let cell_color = board
-    .markers
-    .get(&pos)
-    .map_or(Color::Reset, |marker| match marker {
-        Marker::MovementOption => Color::DarkYellow,
-    });
-
+        .markers
+        .get(&pos)
+        .map_or(Color::Reset, |marker| match marker {
+            Marker::MovementOption => Color::DarkYellow,
+        });
 
     execute!(
         out,
