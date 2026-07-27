@@ -52,11 +52,11 @@ impl BoardDisplay for ChessTerminal {
 
             let nr_spaces = (INITIAL_X_OFFSET - space_count * 3) as usize;
             let whitespace = " ".repeat(nr_spaces);
-            let char_notation = num_to_char_notation(y)?;
+            let char_notation = num_to_char_notation(y+1)?;
             execute!(out, Print(whitespace), Print(format!("{char_notation}  ")))?;
 
             for x in x_range[y].clone() {
-                let pos = Position{y,x};
+                let pos = Position{y: y+1,x};
                 print_cell(board, pos, &mut out)?;
 
             }

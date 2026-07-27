@@ -15,7 +15,7 @@ fn main() -> Result<()> {
 
     //let _piece = Piece::new(('A', 1), game::PieceType::King, game::PlayerColor::Black)?;
     let mut pieces = Vec::new();
-    let rook_pos = Position::from_human(('F',6))?;
+    let rook_pos = Position::try_from(('F',6))?;
     let rook = Piece::new(rook_pos, PieceType::Rook, Color::Black)?;
     pieces.push(rook);
 

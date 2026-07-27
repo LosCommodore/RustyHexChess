@@ -60,7 +60,7 @@ impl Piece {
 
 pub fn get_startup_pieces_black() -> Result<Vec<Piece>> {
     let color = Color::Black;
-    let human = Position::from_human;
+    let human = Position::try_from;
     let mut pieces = vec![
         Piece::new(human(('E', 10))?, PieceType::King, color)?,
         Piece::new(human(('G', 10))?, PieceType::Queen, color)?,
@@ -85,7 +85,7 @@ pub fn get_startup_pieces_black() -> Result<Vec<Piece>> {
 
 pub fn get_startup_pieces_white() -> Result<Vec<Piece>> {
     let color = Color::White;
-    let human = Position::from_human;
+    let human = Position::try_from;
 
     let mut pieces = vec![
         Piece::new(human(('E', 1))?, PieceType::King, color)?,

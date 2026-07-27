@@ -102,7 +102,7 @@ mod tests {
     #[test]
     fn test_move_rook() {
         let mut board = Board::default();
-        let pos = Position::from_human(('F', 5)).expect("invalid position");
+        let pos = Position::try_from(('F', 5)).expect("invalid position");
         board
             .pieces
             .push(Piece::new(pos, PieceType::Rook, Color::Black).expect("wrong piece definition"));
