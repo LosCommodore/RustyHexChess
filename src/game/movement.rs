@@ -1,6 +1,6 @@
 #![allow(unused)]
 
-use crate::game::piece::PieceType;
+use crate::game::{piece::PieceType};
 type Offset = (isize, isize);
 
 // Name of Directions like in the pictures from:  doc/coordinates.drawio (first picture)
@@ -31,7 +31,7 @@ const EDGE_6: Offset = (-2, 1);
 pub enum MovementPattern {
     Walk(Offset),
     Step(&'static [Offset]),
-    Jump(&'static [Offset]),
+    Pawn,
 }
 
 const ROOK_MOVEMENTS: &'static [MovementPattern] = &[
@@ -57,15 +57,46 @@ const BISHOP_MOVEMENTS: &'static [MovementPattern] = &[
     MovementPattern::Walk(EDGE_6),
 ];
 
+const QUEEN_MOVEMENTS: &'static [MovementPattern] = &[
+    MovementPattern::Walk(UP),
+    MovementPattern::Walk(DOWN),
+    MovementPattern::Walk(UP_LEFT),
+    MovementPattern::Walk(DOWN_RIGHT),
+    MovementPattern::Walk(UP_RIGHT),
+    MovementPattern::Walk(DOWN_LEFT),
+    MovementPattern::Walk(EDGE_1),
+    MovementPattern::Walk(EDGE_2),
+    MovementPattern::Walk(EDGE_3),
+    MovementPattern::Walk(EDGE_4),
+    MovementPattern::Walk(EDGE_5),
+    MovementPattern::Walk(EDGE_6),
+];
+
+const KNIGHT_MOVEMENTS: &'static [MovementPattern] = &[MovementPattern::Step(&[
+    (2, 1),
+    (1, 2),
+    (3, -1),
+    (3, -2),
+    (1, -3),
+    (2, -3),
+    (-2, -1),
+    (-1, -2),
+    (-3, 1),
+    (-3, 2),
+    (-1, 3),
+    (-2, 3),
+])];
+
+
 pub fn get_movement_patterns(piece_type: PieceType) -> &'static [MovementPattern] {
     use PieceType::*;
 
     match piece_type {
         King => KING_MOVEMENTS,
-        Queen => todo!(),
+        Queen => QUEEN_MOVEMENTS,
         Rook => ROOK_MOVEMENTS,
         Bishop => BISHOP_MOVEMENTS,
-        Pawn => todo!(),
-        Knight => todo!(),
+        Pawn => &[MovementPattern::Pawn],
+        Knight => KNIGHT_MOVEMENTS,
     }
 }

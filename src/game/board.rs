@@ -28,13 +28,9 @@ impl Board {
         let mut options: Vec<Position> = Vec::new();
         for p in get_movement_patterns(me.piece_type()) {
             match p {
-                MovementPattern::Walk(offset) => {
-                    options.extend(self.do_walk(me, pos, *offset));
-                }
-                MovementPattern::Step(steps) => {
-                    options.extend(self.do_step(me, pos, *steps));
-                }
-                _ => todo!(),
+                MovementPattern::Walk(offset) => options.extend(self.do_walk(me, pos, *offset)),
+                MovementPattern::Step(steps) => options.extend(self.do_step(me, pos, *steps)),
+                MovementPattern::Pawn => options.extend(self.move_pawn(me, pos)),
             }
         }
         Ok(options)
@@ -66,7 +62,13 @@ impl Board {
         }
         Some(pos)
     }
+    fn move_pawn(&self, me: &Piece, pos: Position) -> Vec<Position> {
+        let mut options = Vec::new();
+        options
+    }
+   
 
+    /// A step is a direkt move to another position, no blocking of movements.
     fn do_step(&self, me: &Piece, pos: Position, steps: &[(isize, isize)]) -> Vec<Position> {
         let mut options = Vec::new();
 
