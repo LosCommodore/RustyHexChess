@@ -5,6 +5,7 @@ use super::piece::Piece;
 use crate::game::{
     coordinates::{Position, X_RANGE},
     movement::{MovementPattern, get_movement_patterns},
+    piece::{Color}
 };
 use anyhow::{Result, bail};
 
@@ -42,6 +43,7 @@ impl Board {
         me: &Piece,
         dy: isize,
         dx: isize,
+        capture_only: bool  // move only allowed if a piece is captured (used for pawn)
     ) -> Option<Position> {
         let Some(y) = pos.y.checked_add_signed(dy) else {
             return None;
@@ -59,23 +61,42 @@ impl Board {
             if piece.color() == me.color() {
                 return None;
             }
+        } else {
+            if capture_only {return None;}
         }
+
         Some(pos)
     }
+
+    
     fn move_pawn(&self, me: &Piece, pos: Position) -> Vec<Position> {
         let mut options = Vec::new();
+        let color = me.color;
+
+        let step = if color == Color::White {1} else {-1};
+        let offset = (0,step);
+        options.extend(self.do_step(me, pos, &[offset]));
+
+        let capture_moves = match color {
+            Color::White => &[(1,0),(-1,1)],
+            Color::Black => &[(-1,0),(1,-1)]
+        };
+
+        for (dy, dx) in capture_moves {
+                  let option =  self.is_movement_option(&pos, me, *dy, *dx, true); 
+           options.extend(option);
+        }
         options
     }
    
 
     /// A step is a direkt move to another position, no blocking of movements.
     fn do_step(&self, me: &Piece, pos: Position, steps: &[(isize, isize)]) -> Vec<Position> {
-        let mut options = Vec::new();
+        let mut options: Vec<Position> = Vec::new();
 
         for (dy, dx) in steps {
-            if let Some(new_pos) = self.is_movement_option(&pos, me, *dy, *dx) {
-                options.push(new_pos);
-            }
+           let option =  self.is_movement_option(&pos, me, *dy, *dx, false); 
+           options.extend(option);
         }
 
         options
@@ -84,7 +105,7 @@ impl Board {
     fn do_walk(&self, me: &Piece, mut pos: Position, (dy, dx): (isize, isize)) -> Vec<Position> {
         let mut options = Vec::new();
         loop {
-            let Some(new_pos) = self.is_movement_option(&pos, me, dy, dx) else {
+            let Some(new_pos) = self.is_movement_option(&pos, me, dy, dx, false) else {
                 return options;
             };
             options.push(new_pos);
