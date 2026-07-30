@@ -13,10 +13,15 @@ use crate::{
     },
 };
 
-fn show_options(board: &mut Board, piece_pos: Position) -> Result<()> {
-    let options = board.get_movement_options(piece_pos)?;
+fn show_options<T>(board: &mut Board, piece_pos: T) -> Result<()>
+where
+    T: TryInto<Position>,
+    T::Error: Into<anyhow::Error>,
+{
+    let pos = piece_pos.try_into().map_err(Into::into)?;
+    let options = board.get_movement_options(pos)?;
     for p in options {
-        board.markers.insert(p, Marker::MovementOption);
+        board.markers.insert(p.pos, Marker::MovementOption);
     }
     Ok(())
 }
@@ -46,7 +51,8 @@ fn main() -> Result<()> {
     board.pieces.extend(black_pieces);
     //board.pieces.insert(king_pos, king);
     //board.pieces.insert(piece_pos, piece);
-    //show_options
+    let options = show_options(&mut board, ('F',5));
+
     
 
     let terminal = ChessTerminal;
@@ -54,3 +60,5 @@ fn main() -> Result<()> {
 
     Ok(())
 }
+
+

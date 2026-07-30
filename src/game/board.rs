@@ -14,27 +14,52 @@ pub enum Marker {
     MovementOption,
 }
 
+
+/// Possible Actions for a Piece
+/// Note:
+/// - There is no castling
+/// The Pawn is the special case:
+/// - The pawn may move one vacant cell vertically forward. 
+///   1. If it stands on its starting cell or on the starting cell of any other pawn of its colour, 
+///      then it is also allowed to move two vacant cells vertically forward. 
+///   2. It may capture one cell orthogonally forward at a 60° angle to the vertical, including capturing en passant. 
+///   3. It is promoted when it reaches the end of any file.
+#[derive(Clone, Copy, Debug)]
+pub enum Action {
+    Move,
+    Capture,
+    CaputreEnPassant,
+    Promote, 
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct Move {
+    pub pos: Position,
+    pub action: Action
+}
+
 #[derive(Default)]
 pub struct Board {
     pub pieces: HashMap<Position, Piece>,
     pub markers: HashMap<Position, Marker>,
 }
 
+
 impl Board {
-    pub fn get_movement_options(&self, pos: Position) -> Result<Vec<Position>> {
+    pub fn get_movement_options(&self, pos: Position) -> Result<Vec<Move>> {
         let Some(me) = self.pieces.get(&pos) else {
             bail!("No piece on this coordinate");
         };
 
-        let mut options: Vec<Position> = Vec::new();
+        let mut moves = Vec::new();
         for p in get_movement_patterns(me.piece_type()) {
             match p {
-                MovementPattern::Walk(offset) => options.extend(self.do_walk(me, pos, *offset)),
-                MovementPattern::Step(steps) => options.extend(self.do_step(me, pos, *steps)),
-                MovementPattern::Pawn => options.extend(self.move_pawn(me, pos)),
+                MovementPattern::Walk(offset) => moves.extend(self.do_walk(me, pos, *offset)),
+                MovementPattern::Step(steps) => moves.extend(self.do_step(me, pos, *steps)),
+                MovementPattern::Pawn => moves.extend(self.move_pawn(me, pos)),
             }
         }
-        Ok(options)
+        Ok(moves)
     }
 
     pub fn is_movement_option(
@@ -44,7 +69,8 @@ impl Board {
         dy: isize,
         dx: isize,
         capture_only: bool  // move only allowed if a piece is captured (used for pawn)
-    ) -> Option<Position> {
+    ) -> Option<Move> {
+       
         let Some(y) = pos.y.checked_add_signed(dy) else {
             return None;
         };
@@ -60,21 +86,24 @@ impl Board {
         if let Some(piece) = self.pieces.get(&pos) {
             if piece.color() == me.color() {
                 return None;
-            }
-        } else {
-            if capture_only {return None;}
+            } else {
+            return Some(Move{pos, action:Action::Capture })
+            };
         }
 
-        Some(pos)
+        if capture_only {return None;}
+        Some(Move{pos:pos,action:Action::Move })
     }
 
-    
-    fn move_pawn(&self, me: &Piece, pos: Position) -> Vec<Position> {
+
+    fn move_pawn(&self, me: &Piece, pos: Position) -> Vec<Move> {
         let mut options = Vec::new();
         let color = me.color;
 
         let step = if color == Color::White {1} else {-1};
         let offset = (0,step);
+        let mv = Move{pos, action: Action::Move};
+
         options.extend(self.do_step(me, pos, &[offset]));
 
         let capture_moves = match color {
@@ -91,8 +120,8 @@ impl Board {
    
 
     /// A step is a direkt move to another position, no blocking of movements.
-    fn do_step(&self, me: &Piece, pos: Position, steps: &[(isize, isize)]) -> Vec<Position> {
-        let mut options: Vec<Position> = Vec::new();
+    fn do_step(&self, me: &Piece, pos: Position, steps: &[(isize, isize)]) -> Vec<Move> {
+        let mut options = Vec::new();
 
         for (dy, dx) in steps {
            let option =  self.is_movement_option(&pos, me, *dy, *dx, false); 
@@ -102,14 +131,14 @@ impl Board {
         options
     }
 
-    fn do_walk(&self, me: &Piece, mut pos: Position, (dy, dx): (isize, isize)) -> Vec<Position> {
+    fn do_walk(&self, me: &Piece, mut pos: Position, (dy, dx): (isize, isize)) -> Vec<Move> {
         let mut options = Vec::new();
         loop {
-            let Some(new_pos) = self.is_movement_option(&pos, me, dy, dx, false) else {
+            let Some(new_move) = self.is_movement_option(&pos, me, dy, dx, false) else {
                 return options;
             };
-            options.push(new_pos);
-            pos = new_pos;
+            options.push(new_move);
+            pos = new_move.pos;
         }
     }
 }
