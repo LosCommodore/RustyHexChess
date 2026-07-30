@@ -3,7 +3,6 @@
 mod display;
 mod game;
 
-use anyhow::Result;
 use crate::{
     display::{BoardDisplay, ChessTerminal},
     game::{
@@ -12,6 +11,7 @@ use crate::{
         piece::{Color, Piece, PieceType, get_startup_pieces_black, get_startup_pieces_white},
     },
 };
+use anyhow::Result;
 
 fn show_options<T>(board: &mut Board, piece_pos: T) -> Result<()>
 where
@@ -26,7 +26,6 @@ where
     Ok(())
 }
 
-
 fn main() -> Result<()> {
     ChessTerminal::clc()?;
 
@@ -34,13 +33,13 @@ fn main() -> Result<()> {
 
     let white_pieces = get_startup_pieces_white()?;
     let black_pieces = get_startup_pieces_black()?;
-    
+
     let piece_pos = Position::try_from(('D', 6))?;
     let piece = Piece {
         piece_type: PieceType::Knight,
         color: Color::Black,
     };
-  
+
     let king_pos = Position::try_from(('H', 6))?;
     let king = Piece {
         piece_type: PieceType::King,
@@ -51,14 +50,10 @@ fn main() -> Result<()> {
     board.pieces.extend(black_pieces);
     //board.pieces.insert(king_pos, king);
     //board.pieces.insert(piece_pos, piece);
-    let options = show_options(&mut board, ('F',5));
-
-    
+    let options = show_options(&mut board, ('F', 5));
 
     let terminal = ChessTerminal;
     terminal.display(&board)?;
 
     Ok(())
 }
-
-

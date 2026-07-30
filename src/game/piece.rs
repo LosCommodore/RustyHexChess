@@ -3,6 +3,30 @@ use std::collections::HashMap;
 use super::coordinates::*;
 use anyhow::{Ok, Result};
 
+pub const WHITE_PAWNS_STARTING_POSITIONS: [(char, usize); 9] = [
+    ('B', 5),
+    ('C', 5),
+    ('D', 5),
+    ('E', 5),
+    ('F', 5),
+    ('G', 4),
+    ('H', 3),
+    ('I', 2),
+    ('J', 1),
+];
+
+pub const BLACK_PAWNS_STARTING_POSITIONS: [(char, usize); 9] = [
+    ('B', 11),
+    ('C', 10),
+    ('D', 9),
+    ('E', 8),
+    ('F', 7),
+    ('G', 7),
+    ('H', 7),
+    ('I', 7),
+    ('J', 7),
+];
+
 pub struct Piece {
     pub piece_type: PieceType,
     pub color: Color,
@@ -69,20 +93,8 @@ pub fn get_startup_pieces_black() -> Result<HashMap<Position, Piece>> {
     insert(('H', 9), PieceType::Knight)?;
     insert(('C', 11), PieceType::Rook)?;
     insert(('I', 8), PieceType::Rook)?;
-    
-    let pawns = [
-        ('b', 11),
-        ('c', 10),
-        ('d', 9),
-        ('e', 8),
-        ('f', 7),
-        ('g', 7),
-        ('h', 7),
-        ('i', 7),
-        ('j', 7),
-    ];
 
-    for pawn in pawns {
+    for pawn in BLACK_PAWNS_STARTING_POSITIONS {
         insert(pawn, PieceType::Pawn)?;
     }
     Ok(out)
@@ -112,19 +124,7 @@ pub fn get_startup_pieces_white() -> Result<HashMap<Position, Piece>> {
         insert(('I', 1), PieceType::Rook)?,
     ];
 
-    let pawns = [
-        ('b', 5),
-        ('c', 5),
-        ('d', 5),
-        ('e', 5),
-        ('f', 5),
-        ('g', 4),
-        ('h', 3),
-        ('i', 2),
-        ('j', 1),
-    ];
-
-    for pawn in pawns {
+    for pawn in WHITE_PAWNS_STARTING_POSITIONS {
         insert(pawn, PieceType::Pawn)?;
     }
 

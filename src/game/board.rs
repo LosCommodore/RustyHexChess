@@ -3,9 +3,7 @@ use std::{collections::HashMap, fmt::Pointer, todo};
 use super::piece::Piece;
 
 use crate::game::{
-    coordinates::{Position, X_RANGE},
-    movement::{MovementPattern, get_movement_patterns},
-    piece::{Color}
+    coordinates::{BOARD_DIM, HumanCoordinates, Position, X_RANGE}, movement::{MovementPattern, get_movement_patterns}, piece::{BLACK_PAWNS_STARTING_POSITIONS, Color, WHITE_PAWNS_STARTING_POSITIONS},
 };
 use anyhow::{Result, bail};
 
@@ -14,28 +12,27 @@ pub enum Marker {
     MovementOption,
 }
 
-
 /// Possible Actions for a Piece
 /// Note:
 /// - There is no castling
 /// The Pawn is the special case:
-/// - The pawn may move one vacant cell vertically forward. 
-///   1. If it stands on its starting cell or on the starting cell of any other pawn of its colour, 
-///      then it is also allowed to move two vacant cells vertically forward. 
-///   2. It may capture one cell orthogonally forward at a 60° angle to the vertical, including capturing en passant. 
+/// - The pawn may move one vacant cell vertically forward.
+///   1. If it stands on its starting cell or on the starting cell of any other pawn of its colour,
+///      then it is also allowed to move two vacant cells vertically forward.
+///   2. It may capture one cell orthogonally forward at a 60° angle to the vertical, including capturing en passant.
 ///   3. It is promoted when it reaches the end of any file.
 #[derive(Clone, Copy, Debug)]
 pub enum Action {
     Move,
     Capture,
     CaputreEnPassant,
-    Promote, 
+    Promote,
 }
 
 #[derive(Clone, Copy, Debug)]
 pub struct Move {
     pub pos: Position,
-    pub action: Action
+    pub action: Action,
 }
 
 #[derive(Default)]
@@ -43,7 +40,6 @@ pub struct Board {
     pub pieces: HashMap<Position, Piece>,
     pub markers: HashMap<Position, Marker>,
 }
-
 
 impl Board {
     pub fn get_movement_options(&self, pos: Position) -> Result<Vec<Move>> {
@@ -54,9 +50,11 @@ impl Board {
         let mut moves = Vec::new();
         for p in get_movement_patterns(me.piece_type()) {
             match p {
-                MovementPattern::Walk(offset) => moves.extend(self.do_walk(me, pos, *offset)),
+                MovementPattern::Walk { direction, limit } => {
+                    moves.extend(self.do_walk(me, pos, *direction, *limit))
+                }
                 MovementPattern::Step(steps) => moves.extend(self.do_step(me, pos, *steps)),
-                MovementPattern::Pawn => moves.extend(self.move_pawn(me, pos)),
+                MovementPattern::Pawn => moves.extend(self.move_pawn(me, pos)?),
             }
         }
         Ok(moves)
@@ -68,9 +66,8 @@ impl Board {
         me: &Piece,
         dy: isize,
         dx: isize,
-        capture_only: bool  // move only allowed if a piece is captured (used for pawn)
+        capture_only: bool, // move only allowed if a piece is captured (used for pawn)
     ) -> Option<Move> {
-       
         let Some(y) = pos.y.checked_add_signed(dy) else {
             return None;
         };
@@ -87,59 +84,83 @@ impl Board {
             if piece.color() == me.color() {
                 return None;
             } else {
-            return Some(Move{pos, action:Action::Capture })
+                return Some(Move {
+                    pos,
+                    action: Action::Capture,
+                });
             };
         }
 
-        if capture_only {return None;}
-        Some(Move{pos:pos,action:Action::Move })
+        if capture_only {
+            return None;
+        }
+        Some(Move {
+            pos: pos,
+            action: Action::Move,
+        })
     }
 
-
-    fn move_pawn(&self, me: &Piece, pos: Position) -> Vec<Move> {
+    fn move_pawn(&self, me: &Piece, pos: Position) -> Result<Vec<Move>> {
+        let human_pos: HumanCoordinates = pos.try_into()?;
         let mut options = Vec::new();
         let color = me.color;
+        let orientation = if color == Color::White { 1 } else { -1 };
+        let direction = (0, orientation);
 
-        let step = if color == Color::White {1} else {-1};
-        let offset = (0,step);
-        let mv = Move{pos, action: Action::Move};
+        // --- the normal step of the figure
+        options.extend(self.do_step(me, pos, &[direction]));
 
-        options.extend(self.do_step(me, pos, &[offset]));
+        // --- walk two steps from starting position
+        let starting_positions = match color {
+            Color::White => WHITE_PAWNS_STARTING_POSITIONS,
+            Color::Black => BLACK_PAWNS_STARTING_POSITIONS,
+        };
 
+        if starting_positions.contains(&human_pos) {
+            options.extend(self.do_walk(me, pos, direction, Some(2)));
+        }
+
+        // --- capture diagonally
         let capture_moves = match color {
-            Color::White => &[(1,0),(-1,1)],
-            Color::Black => &[(-1,0),(1,-1)]
+            Color::White => &[(1, 0), (-1, 1)],
+            Color::Black => &[(-1, 0), (1, -1)],
         };
 
         for (dy, dx) in capture_moves {
-                  let option =  self.is_movement_option(&pos, me, *dy, *dx, true); 
-           options.extend(option);
+            let option = self.is_movement_option(&pos, me, *dy, *dx, true);
+            options.extend(option);
         }
-        options
+        Ok(options)
     }
-   
 
     /// A step is a direkt move to another position, no blocking of movements.
     fn do_step(&self, me: &Piece, pos: Position, steps: &[(isize, isize)]) -> Vec<Move> {
         let mut options = Vec::new();
 
         for (dy, dx) in steps {
-           let option =  self.is_movement_option(&pos, me, *dy, *dx, false); 
-           options.extend(option);
+            let option = self.is_movement_option(&pos, me, *dy, *dx, false);
+            options.extend(option);
         }
 
         options
     }
 
-    fn do_walk(&self, me: &Piece, mut pos: Position, (dy, dx): (isize, isize)) -> Vec<Move> {
+    fn do_walk(
+        &self,
+        me: &Piece,
+        mut pos: Position,
+        (dy, dx): (isize, isize),
+        limit: Option<usize>,
+    ) -> Vec<Move> {
         let mut options = Vec::new();
-        loop {
+        for _ in 0..limit.unwrap_or(BOARD_DIM) {
             let Some(new_move) = self.is_movement_option(&pos, me, dy, dx, false) else {
                 return options;
             };
             options.push(new_move);
             pos = new_move.pos;
         }
+        options
     }
 }
 

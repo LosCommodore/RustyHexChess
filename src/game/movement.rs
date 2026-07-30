@@ -1,6 +1,6 @@
 #![allow(unused)]
 
-use crate::game::{piece::PieceType};
+use crate::game::piece::PieceType;
 type Offset = (isize, isize);
 
 // Name of Directions like in the pictures from:  doc/coordinates.drawio (first picture)
@@ -29,18 +29,39 @@ const EDGE_6: Offset = (-2, 1);
 
 #[derive(Clone)]
 pub enum MovementPattern {
-    Walk(Offset),
+    Walk {
+        direction: Offset,
+        limit: Option<usize>,
+    }, // Offset
     Step(&'static [Offset]),
     Pawn,
 }
 
 const ROOK_MOVEMENTS: &'static [MovementPattern] = &[
-    MovementPattern::Walk(UP),
-    MovementPattern::Walk(DOWN),
-    MovementPattern::Walk(UP_LEFT),
-    MovementPattern::Walk(DOWN_RIGHT),
-    MovementPattern::Walk(UP_RIGHT),
-    MovementPattern::Walk(DOWN_LEFT),
+    MovementPattern::Walk {
+        direction: UP,
+        limit: None,
+    },
+    MovementPattern::Walk {
+        direction: DOWN,
+        limit: None,
+    },
+    MovementPattern::Walk {
+        direction: UP_LEFT,
+        limit: None,
+    },
+    MovementPattern::Walk {
+        direction: DOWN_RIGHT,
+        limit: None,
+    },
+    MovementPattern::Walk {
+        direction: UP_RIGHT,
+        limit: None,
+    },
+    MovementPattern::Walk {
+        direction: DOWN_LEFT,
+        limit: None,
+    },
 ];
 
 const KING_MOVEMENTS: &'static [MovementPattern] = &[MovementPattern::Step(&[
@@ -49,27 +70,81 @@ const KING_MOVEMENTS: &'static [MovementPattern] = &[MovementPattern::Step(&[
 ])];
 
 const BISHOP_MOVEMENTS: &'static [MovementPattern] = &[
-    MovementPattern::Walk(EDGE_1),
-    MovementPattern::Walk(EDGE_2),
-    MovementPattern::Walk(EDGE_3),
-    MovementPattern::Walk(EDGE_4),
-    MovementPattern::Walk(EDGE_5),
-    MovementPattern::Walk(EDGE_6),
+    MovementPattern::Walk {
+        direction: EDGE_1,
+        limit: None,
+    },
+    MovementPattern::Walk {
+        direction: EDGE_2,
+        limit: None,
+    },
+    MovementPattern::Walk {
+        direction: EDGE_3,
+        limit: None,
+    },
+    MovementPattern::Walk {
+        direction: EDGE_4,
+        limit: None,
+    },
+    MovementPattern::Walk {
+        direction: EDGE_5,
+        limit: None,
+    },
+    MovementPattern::Walk {
+        direction: EDGE_6,
+        limit: None,
+    },
 ];
 
 const QUEEN_MOVEMENTS: &'static [MovementPattern] = &[
-    MovementPattern::Walk(UP),
-    MovementPattern::Walk(DOWN),
-    MovementPattern::Walk(UP_LEFT),
-    MovementPattern::Walk(DOWN_RIGHT),
-    MovementPattern::Walk(UP_RIGHT),
-    MovementPattern::Walk(DOWN_LEFT),
-    MovementPattern::Walk(EDGE_1),
-    MovementPattern::Walk(EDGE_2),
-    MovementPattern::Walk(EDGE_3),
-    MovementPattern::Walk(EDGE_4),
-    MovementPattern::Walk(EDGE_5),
-    MovementPattern::Walk(EDGE_6),
+    MovementPattern::Walk {
+        direction: UP,
+        limit: None,
+    },
+    MovementPattern::Walk {
+        direction: DOWN,
+        limit: None,
+    },
+    MovementPattern::Walk {
+        direction: UP_LEFT,
+        limit: None,
+    },
+    MovementPattern::Walk {
+        direction: DOWN_RIGHT,
+        limit: None,
+    },
+    MovementPattern::Walk {
+        direction: UP_RIGHT,
+        limit: None,
+    },
+    MovementPattern::Walk {
+        direction: DOWN_LEFT,
+        limit: None,
+    },
+    MovementPattern::Walk {
+        direction: EDGE_1,
+        limit: None,
+    },
+    MovementPattern::Walk {
+        direction: EDGE_2,
+        limit: None,
+    },
+    MovementPattern::Walk {
+        direction: EDGE_3,
+        limit: None,
+    },
+    MovementPattern::Walk {
+        direction: EDGE_4,
+        limit: None,
+    },
+    MovementPattern::Walk {
+        direction: EDGE_5,
+        limit: None,
+    },
+    MovementPattern::Walk {
+        direction: EDGE_6,
+        limit: None,
+    },
 ];
 
 const KNIGHT_MOVEMENTS: &'static [MovementPattern] = &[MovementPattern::Step(&[
@@ -86,7 +161,6 @@ const KNIGHT_MOVEMENTS: &'static [MovementPattern] = &[MovementPattern::Step(&[
     (-1, 3),
     (-2, 3),
 ])];
-
 
 pub fn get_movement_patterns(piece_type: PieceType) -> &'static [MovementPattern] {
     use PieceType::*;
