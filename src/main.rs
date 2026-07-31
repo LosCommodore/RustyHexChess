@@ -4,11 +4,8 @@ mod display;
 mod game;
 
 use crate::{
-    display::{BoardDisplay, ChessTerminal},
-    game::{
-        board::{Board, Marker},
-        coordinates::Position,
-        piece::{Color, Piece, PieceType, get_startup_pieces_black, get_startup_pieces_white},
+    display::{BoardDisplay, ChessTerminal}, game::{
+        Game, board::{Board, Marker}, coordinates::Position, piece::{Color, Piece, PieceType, get_startup_pieces_black, get_startup_pieces_white},
     },
 };
 use anyhow::Result;
@@ -29,10 +26,11 @@ where
 fn main() -> Result<()> {
     ChessTerminal::clc()?;
 
+    let mut game = Game::new();
     let mut board = Board::default();
 
-    let white_pieces = get_startup_pieces_white()?;
-    let black_pieces = get_startup_pieces_black()?;
+    let white_pieces = get_startup_pieces_white();
+    let black_pieces = get_startup_pieces_black();
 
     let piece_pos = Position::try_from(('D', 6))?;
     let piece = Piece {

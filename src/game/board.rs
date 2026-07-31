@@ -1,13 +1,27 @@
-use std::{collections::HashMap, fmt::Pointer, todo};
-
 use super::piece::Piece;
+use std::{collections::HashMap, fmt::Pointer, todo};
+use thiserror::Error;
 
 use crate::game::{
-    coordinates::{BOARD_DIM, HumanCoordinates, Position, X_RANGE}, movement::{MovementPattern, get_movement_patterns}, piece::{BLACK_PAWNS_STARTING_POSITIONS, Color, WHITE_PAWNS_STARTING_POSITIONS},
+    coordinates::{BOARD_DIM, HumanCoordinates, Position, X_RANGE},
+    movement::{MovementPattern, get_movement_patterns},
+    piece::{BLACK_PAWNS_STARTING_POSITIONS, Color, WHITE_PAWNS_STARTING_POSITIONS},
 };
 use anyhow::{Result, bail};
 
-#[allow(unused)]
+#[derive(Debug, Error)]
+
+pub enum MoveError {
+    #[error("no piece at source position")]
+    NoPieceAtPosition,
+
+    #[error("destination is not reachable")]
+    IllegalMove,
+
+    #[error("piece belongs to the other player")]
+    WrongPlayer,
+}
+
 pub enum Marker {
     MovementOption,
 }
@@ -51,10 +65,10 @@ impl Board {
         for p in get_movement_patterns(me.piece_type()) {
             match p {
                 MovementPattern::Walk { direction, limit } => {
-                    moves.extend(self.do_walk(me, pos, *direction, *limit))
+                    moves.extend(self.get_walk_moves(me, pos, *direction, *limit))
                 }
-                MovementPattern::Step(steps) => moves.extend(self.do_step(me, pos, *steps)),
-                MovementPattern::Pawn => moves.extend(self.move_pawn(me, pos)?),
+                MovementPattern::Step(steps) => moves.extend(self.get_step_moves(me, pos, *steps)),
+                MovementPattern::Pawn => moves.extend(self.get_pawn_moves(me, pos)),
             }
         }
         Ok(moves)
@@ -100,15 +114,15 @@ impl Board {
         })
     }
 
-    fn move_pawn(&self, me: &Piece, pos: Position) -> Result<Vec<Move>> {
-        let human_pos: HumanCoordinates = pos.try_into()?;
+    // The pawn is a special case and therefore has its own function
+    fn get_pawn_moves(&self, me: &Piece, pos: Position) -> Vec<Move> {
         let mut options = Vec::new();
         let color = me.color;
         let orientation = if color == Color::White { 1 } else { -1 };
         let direction = (0, orientation);
 
         // --- the normal step of the figure
-        options.extend(self.do_step(me, pos, &[direction]));
+        options.extend(self.get_step_moves(me, pos, &[direction]));
 
         // --- walk two steps from starting position
         let starting_positions = match color {
@@ -116,8 +130,8 @@ impl Board {
             Color::Black => BLACK_PAWNS_STARTING_POSITIONS,
         };
 
-        if starting_positions.contains(&human_pos) {
-            options.extend(self.do_walk(me, pos, direction, Some(2)));
+        if starting_positions.contains(&pos) {
+            options.extend(self.get_walk_moves(me, pos, direction, Some(2)));
         }
 
         // --- capture diagonally
@@ -130,11 +144,11 @@ impl Board {
             let option = self.is_movement_option(&pos, me, *dy, *dx, true);
             options.extend(option);
         }
-        Ok(options)
+        options
     }
 
-    /// A step is a direkt move to another position, no blocking of movements.
-    fn do_step(&self, me: &Piece, pos: Position, steps: &[(isize, isize)]) -> Vec<Move> {
+    // A step is a direkt move to another position, no blocking of movements.
+    fn get_step_moves(&self, me: &Piece, pos: Position, steps: &[(isize, isize)]) -> Vec<Move> {
         let mut options = Vec::new();
 
         for (dy, dx) in steps {
@@ -145,15 +159,16 @@ impl Board {
         options
     }
 
-    fn do_walk(
+    // Walking is stepping into the directon (dy,dx) for nr_steps
+    fn get_walk_moves(
         &self,
         me: &Piece,
         mut pos: Position,
         (dy, dx): (isize, isize),
-        limit: Option<usize>,
+        nr_steps: Option<usize>,
     ) -> Vec<Move> {
         let mut options = Vec::new();
-        for _ in 0..limit.unwrap_or(BOARD_DIM) {
+        for _ in 0..nr_steps.unwrap_or(BOARD_DIM) {
             let Some(new_move) = self.is_movement_option(&pos, me, dy, dx, false) else {
                 return options;
             };
