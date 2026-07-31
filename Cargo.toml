@@ -6,3 +6,4 @@ edition = "2024"
 [dependencies]
 anyhow = "1.0.103"
 crossterm = "0.29.0"
+thiserror = "2.0.19"
