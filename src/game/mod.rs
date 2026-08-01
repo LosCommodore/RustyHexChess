@@ -1,22 +1,35 @@
+use std::{default, todo};
+
 use crate::game::{
-    board::Board,
-    piece::{get_startup_pieces_black, get_startup_pieces_white},
+    board::{Action, Board, MoveError, MoveOption},
+    coordinates::Position,
+    piece::{Piece, get_startup_pieces_black, get_startup_pieces_white},
 };
 
 pub mod board;
 pub mod coordinates;
-pub mod piece;
 mod movement;
+pub mod piece;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Side {
+    #[default]
     White,
     Black,
 }
 
+pub struct Move {
+    piece: Piece,
+    origin: Position,
+    destination: Position,
+    action: Action,
+}
+
+#[derive(Default)]
 pub struct Game {
     board: Board,
     active_side: Side,
+    moves: Vec<Move>,
 }
 
 impl Game {
@@ -26,12 +39,31 @@ impl Game {
         board.pieces.extend(get_startup_pieces_black());
         Game {
             board,
-            active_side: Side::White,
+            ..Default::default()
         }
     }
-    
-    //pub fn make_move(...) -> Result<(), MoveError>;
+
+    pub fn make_move(
+        &mut self,
+        origin: Position,
+        destination: Position,
+    ) -> Result<Move, MoveError> {
+        let options = self.board.get_movement_options(origin)?;
+
+        let valid_move = options
+            .iter()
+            .find(|option| option.pos == destination)
+            .ok_or(MoveError::IllegalMove)?;
+
+        match valid_move.action {
+            Action::Capture => todo!(),
+            Action::Move => todo!(),
+            Action::Promote => todo!(),
+            Action::CaputreEnPassant => todo!(),
+        }
+
+        todo!()
+    }
     //pub fn possible_moves(...) -> Vec<Move>;
     //pub fn piece_at(...) -> Option<&Piece>;
-
 }

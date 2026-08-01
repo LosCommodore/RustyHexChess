@@ -7,10 +7,8 @@ use crate::game::{
     movement::{MovementPattern, get_movement_patterns},
     piece::{BLACK_PAWNS_STARTING_POSITIONS, Color, WHITE_PAWNS_STARTING_POSITIONS},
 };
-use anyhow::{Result, bail};
 
 #[derive(Debug, Error)]
-
 pub enum MoveError {
     #[error("no piece at source position")]
     NoPieceAtPosition,
@@ -21,6 +19,8 @@ pub enum MoveError {
     #[error("piece belongs to the other player")]
     WrongPlayer,
 }
+
+type Result<T> = std::result::Result<T, MoveError>;
 
 pub enum Marker {
     MovementOption,
@@ -44,7 +44,7 @@ pub enum Action {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub struct Move {
+pub struct MoveOption {
     pub pos: Position,
     pub action: Action,
 }
@@ -56,10 +56,8 @@ pub struct Board {
 }
 
 impl Board {
-    pub fn get_movement_options(&self, pos: Position) -> Result<Vec<Move>> {
-        let Some(me) = self.pieces.get(&pos) else {
-            bail!("No piece on this coordinate");
-        };
+    pub fn get_movement_options(&self, pos: Position) -> Result<Vec<MoveOption>> {
+        let me = self.pieces.get(&pos).ok_or(MoveError::NoPieceAtPosition)?;
 
         let mut moves = Vec::new();
         for p in get_movement_patterns(me.piece_type()) {
@@ -81,7 +79,7 @@ impl Board {
         dy: isize,
         dx: isize,
         capture_only: bool, // move only allowed if a piece is captured (used for pawn)
-    ) -> Option<Move> {
+    ) -> Option<MoveOption> {
         let Some(y) = pos.y.checked_add_signed(dy) else {
             return None;
         };
@@ -98,7 +96,7 @@ impl Board {
             if piece.color() == me.color() {
                 return None;
             } else {
-                return Some(Move {
+                return Some(MoveOption {
                     pos,
                     action: Action::Capture,
                 });
@@ -108,14 +106,14 @@ impl Board {
         if capture_only {
             return None;
         }
-        Some(Move {
+        Some(MoveOption {
             pos: pos,
             action: Action::Move,
         })
     }
 
     // The pawn is a special case and therefore has its own function
-    fn get_pawn_moves(&self, me: &Piece, pos: Position) -> Vec<Move> {
+    fn get_pawn_moves(&self, me: &Piece, pos: Position) -> Vec<MoveOption> {
         let mut options = Vec::new();
         let color = me.color;
         let orientation = if color == Color::White { 1 } else { -1 };
@@ -148,7 +146,12 @@ impl Board {
     }
 
     // A step is a direkt move to another position, no blocking of movements.
-    fn get_step_moves(&self, me: &Piece, pos: Position, steps: &[(isize, isize)]) -> Vec<Move> {
+    fn get_step_moves(
+        &self,
+        me: &Piece,
+        pos: Position,
+        steps: &[(isize, isize)],
+    ) -> Vec<MoveOption> {
         let mut options = Vec::new();
 
         for (dy, dx) in steps {
@@ -166,7 +169,7 @@ impl Board {
         mut pos: Position,
         (dy, dx): (isize, isize),
         nr_steps: Option<usize>,
-    ) -> Vec<Move> {
+    ) -> Vec<MoveOption> {
         let mut options = Vec::new();
         for _ in 0..nr_steps.unwrap_or(BOARD_DIM) {
             let Some(new_move) = self.is_movement_option(&pos, me, dy, dx, false) else {
