@@ -103,6 +103,16 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "crossterm",
+ "hexagon_logic",
+ "thiserror",
+]
+
+[[package]]
+name = "hexagon_logic"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "crossterm",
  "thiserror",
 ]
 

@@ -4,5 +4,9 @@
   "rust-analyzer.inlayHints.parameterHints.enable": true,
   "rust-analyzer.inlayHints.chainingHints.enable": false,
   "rust-analyzer.inlayHints.closureReturnTypeHints.enable": "never",
-  "rust-analyzer.inlayHints.lifetimeElisionHints.enable": "never"
+  "rust-analyzer.inlayHints.lifetimeElisionHints.enable": "never",
+  "cSpell.words": [
+    "crossterm",
+    "thiserror"
+  ]
 }

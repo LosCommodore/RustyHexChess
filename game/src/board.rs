@@ -1,9 +1,9 @@
 use super::piece::Piece;
-use std::{collections::HashMap, fmt::Pointer, todo};
+use std::collections::HashMap;
 use thiserror::Error;
 
-use crate::game::{
-    coordinates::{BOARD_DIM, HumanCoordinates, Position, X_RANGE},
+use crate::{
+    coordinates::{BOARD_DIM, Position},
     movement::{MovementPattern, get_movement_patterns},
     piece::{BLACK_PAWNS_STARTING_POSITIONS, Color, WHITE_PAWNS_STARTING_POSITIONS},
 };
@@ -31,7 +31,7 @@ pub enum Marker {
 /// - There is no castling
 /// The Pawn is the special case:
 /// - The pawn may move one vacant cell vertically forward.
-///   1. If it stands on its starting cell or on the starting cell of any other pawn of its colour,
+///   1. If it stands on its starting cell or on the starting cell of any other pawn of its color,
 ///      then it is also allowed to move two vacant cells vertically forward.
 ///   2. It may capture one cell orthogonally forward at a 60° angle to the vertical, including capturing en passant.
 ///   3. It is promoted when it reaches the end of any file.
@@ -39,7 +39,7 @@ pub enum Marker {
 pub enum Action {
     Move,
     Capture,
-    CaputreEnPassant,
+    CaptureEnPassant,
     Promote,
 }
 
@@ -145,7 +145,7 @@ impl Board {
         options
     }
 
-    // A step is a direkt move to another position, no blocking of movements.
+    // A step is a direct move to another position, no blocking of movements.
     fn get_step_moves(
         &self,
         me: &Piece,
@@ -162,7 +162,7 @@ impl Board {
         options
     }
 
-    // Walking is stepping into the directon (dy,dx) for nr_steps
+    // Walking is stepping into the direction (dy,dx) for nr_steps
     fn get_walk_moves(
         &self,
         me: &Piece,

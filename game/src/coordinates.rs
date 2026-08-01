@@ -1,4 +1,4 @@
-use std::fmt::{self, write};
+use std::fmt::{self};
 
 use anyhow::{Result, bail};
 
@@ -44,7 +44,7 @@ impl fmt::Display for Position {
         let Ok(human) = HumanCoordinates::try_from(self.clone()) else {
             return write!(f, "ERROR, invalid coordinate");
         };
-        write!(f, "Raw: {self:?} === {human:?} ");
+        _ = write!(f, "Raw: {self:?} === {human:?} ");
         Ok(())
     }
 }
@@ -68,7 +68,7 @@ impl TryFrom<Position> for HumanCoordinates {
 }
 
 pub fn num_to_char_notation(num: usize) -> Result<char> {
-    let mut code = num + 65; // 65 == ASCII('A')
+    let code = num + 65; // 65 == ASCII('A')
     let c = char::from(u8::try_from(code)?);
     Ok(c)
 }

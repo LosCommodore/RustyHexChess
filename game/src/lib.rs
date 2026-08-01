@@ -1,7 +1,7 @@
-use std::{default, todo};
+use std::todo;
 
-use crate::game::{
-    board::{Action, Board, MoveError, MoveOption},
+use crate::{
+    board::{Action, Board, MoveError},
     coordinates::Position,
     piece::{Piece, get_startup_pieces_black, get_startup_pieces_white},
 };
@@ -18,6 +18,7 @@ pub enum Side {
     Black,
 }
 
+#[allow(unused)]
 pub struct Move {
     piece: Piece,
     origin: Position,
@@ -25,6 +26,7 @@ pub struct Move {
     action: Action,
 }
 
+#[allow(unused)]
 #[derive(Default)]
 pub struct Game {
     board: Board,
@@ -59,11 +61,12 @@ impl Game {
             Action::Capture => todo!(),
             Action::Move => todo!(),
             Action::Promote => todo!(),
-            Action::CaputreEnPassant => todo!(),
+            Action::CaptureEnPassant => todo!(),
         }
+    }
 
-        todo!()
+    pub fn board(&self) -> &Board {
+        &self.board
     }
     //pub fn possible_moves(...) -> Vec<Move>;
-    //pub fn piece_at(...) -> Option<&Piece>;
 }

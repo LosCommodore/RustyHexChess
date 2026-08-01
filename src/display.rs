@@ -1,7 +1,3 @@
-use crate::game::board::Board;
-use crate::game::board::Marker;
-use crate::game::coordinates::{Position, X_RANGE, num_to_char_notation};
-use crate::game::piece::Color as PieceColor;
 use anyhow::Result;
 use crossterm::style::{Color, SetBackgroundColor, SetForegroundColor};
 use crossterm::terminal::disable_raw_mode;
@@ -11,6 +7,10 @@ use crossterm::{
 };
 use crossterm::{cursor::MoveToNextLine, execute, style::Print};
 use crossterm::{cursor::Show, style::ResetColor};
+use hexagon_logic::board::Board;
+use hexagon_logic::board::Marker;
+use hexagon_logic::coordinates::{Position, X_RANGE, num_to_char_notation};
+use hexagon_logic::piece::Color as PieceColor;
 use std::io::{Write, stdout};
 
 const BOARD_DIM: usize = 11;

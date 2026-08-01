@@ -1,6 +1,6 @@
 #![allow(unused)]
 
-use crate::game::piece::PieceType;
+use crate::piece::PieceType;
 type Offset = (isize, isize);
 
 // Name of Directions like in the pictures from:  doc/coordinates.drawio (first picture)

@@ -1,13 +1,14 @@
 #![allow(unused)]
 
 mod display;
-mod game;
-
-use crate::{
-    display::{BoardDisplay, ChessTerminal}, game::{
-        Game, board::{Board, Marker}, coordinates::Position, piece::{Color, Piece, PieceType, get_startup_pieces_black, get_startup_pieces_white},
-    },
+use hexagon_logic::{
+    Game,
+    board::{Board, Marker},
+    coordinates::Position,
+    piece::{Color, Piece, PieceType, get_startup_pieces_black, get_startup_pieces_white},
 };
+
+use crate::display::{BoardDisplay, ChessTerminal};
 use anyhow::Result;
 
 fn show_options<T>(board: &mut Board, piece_pos: T) -> Result<()>

@@ -110,17 +110,16 @@ pub fn get_startup_pieces_white() -> HashMap<Position, Piece> {
         out.insert(Position::try_from(pos)?, Piece { piece_type, color });
         Ok(())
     };
-    let mut pieces = vec![
-        insert(('E', 2), PieceType::King).unwrap(),
-        insert(('G', 1), PieceType::Queen).unwrap(),
-        insert(('F', 1), PieceType::Bishop).unwrap(),
-        insert(('F', 2), PieceType::Bishop).unwrap(),
-        insert(('F', 3), PieceType::Bishop).unwrap(),
-        insert(('D', 3), PieceType::Knight).unwrap(),
-        insert(('H', 1), PieceType::Knight).unwrap(),
-        insert(('C', 4), PieceType::Rook).unwrap(),
-        insert(('I', 1), PieceType::Rook).unwrap(),
-    ];
+
+    insert(('E', 2), PieceType::King).unwrap();
+    insert(('G', 1), PieceType::Queen).unwrap();
+    insert(('F', 1), PieceType::Bishop).unwrap();
+    insert(('F', 2), PieceType::Bishop).unwrap();
+    insert(('F', 3), PieceType::Bishop).unwrap();
+    insert(('D', 3), PieceType::Knight).unwrap();
+    insert(('H', 1), PieceType::Knight).unwrap();
+    insert(('C', 4), PieceType::Rook).unwrap();
+    insert(('I', 1), PieceType::Rook).unwrap();
 
     for pos in WHITE_PAWNS_STARTING_POSITIONS {
         out.insert(
