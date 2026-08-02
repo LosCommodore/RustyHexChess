@@ -7,10 +7,10 @@ use crossterm::{
 };
 use crossterm::{cursor::MoveToNextLine, execute, style::Print};
 use crossterm::{cursor::Show, style::ResetColor};
+use hexagon_logic::Side;
 use hexagon_logic::board::Board;
 use hexagon_logic::board::Marker;
 use hexagon_logic::coordinates::{Position, X_RANGE, num_to_char_notation};
-use hexagon_logic::piece::Color as PieceColor;
 use std::io::{Write, stdout};
 
 const BOARD_DIM: usize = 11;
@@ -74,9 +74,9 @@ fn print_cell(board: &Board, pos: Position, out: &mut impl Write) -> Result<()> 
     let piece = board.pieces.get(&pos);
 
     let foreground_color = match piece {
-        Some(p) => match p.color() {
-            PieceColor::Black => Color::Blue,
-            PieceColor::White => Color::Red,
+        Some(p) => match p.side() {
+            Side::Black => Color::Blue,
+            Side::White => Color::Red,
         },
         None => Color::Reset,
     };

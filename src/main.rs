@@ -2,10 +2,10 @@
 
 mod display;
 use hexagon_logic::{
-    Game,
+    Game, Side,
     board::{Board, Marker},
     coordinates::Position,
-    piece::{Color, Piece, PieceType, get_startup_pieces_black, get_startup_pieces_white},
+    piece::{Piece, PieceType, get_startup_pieces_black, get_startup_pieces_white},
 };
 
 use crate::display::{BoardDisplay, ChessTerminal};
@@ -36,13 +36,13 @@ fn main() -> Result<()> {
     let piece_pos = Position::try_from(('D', 6))?;
     let piece = Piece {
         piece_type: PieceType::Knight,
-        color: Color::Black,
+        side: Side::Black,
     };
 
     let king_pos = Position::try_from(('H', 6))?;
     let king = Piece {
         piece_type: PieceType::King,
-        color: Color::Black,
+        side: Side::Black,
     };
 
     board.pieces.extend(white_pieces);

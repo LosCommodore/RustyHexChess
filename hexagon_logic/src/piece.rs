@@ -1,3 +1,4 @@
+use crate::Side;
 use std::collections::HashMap;
 
 use super::coordinates::*;
@@ -27,15 +28,10 @@ pub const BLACK_PAWNS_STARTING_POSITIONS: [Position; 9] = [
     Position { y: 9, x: 6 },  // ('J', 7)
 ];
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Piece {
     pub piece_type: PieceType,
-    pub color: Color,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Color {
-    Black,
-    White,
+    pub side: Side,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -66,17 +62,23 @@ impl Piece {
         self.piece_type
     }
 
-    pub fn color(&self) -> Color {
-        self.color
+    pub fn side(&self) -> Side {
+        self.side
     }
 }
 
 pub fn get_startup_pieces_black() -> HashMap<Position, Piece> {
-    let color = Color::Black;
+    let color = Side::Black;
     let mut out = HashMap::new();
 
     let mut insert = |pos: HumanCoordinates, piece_type: PieceType| -> Result<()> {
-        out.insert(Position::try_from(pos)?, Piece { piece_type, color });
+        out.insert(
+            Position::try_from(pos)?,
+            Piece {
+                piece_type,
+                side: color,
+            },
+        );
         Ok(())
     };
 
@@ -95,7 +97,7 @@ pub fn get_startup_pieces_black() -> HashMap<Position, Piece> {
             pos,
             Piece {
                 piece_type: PieceType::Pawn,
-                color,
+                side: color,
             },
         );
     }
@@ -103,11 +105,17 @@ pub fn get_startup_pieces_black() -> HashMap<Position, Piece> {
 }
 
 pub fn get_startup_pieces_white() -> HashMap<Position, Piece> {
-    let color = Color::White;
+    let color = Side::White;
 
     let mut out = HashMap::new();
     let mut insert = |pos: HumanCoordinates, piece_type: PieceType| -> Result<()> {
-        out.insert(Position::try_from(pos)?, Piece { piece_type, color });
+        out.insert(
+            Position::try_from(pos)?,
+            Piece {
+                piece_type,
+                side: color,
+            },
+        );
         Ok(())
     };
 
@@ -126,7 +134,7 @@ pub fn get_startup_pieces_white() -> HashMap<Position, Piece> {
             pos,
             Piece {
                 piece_type: PieceType::Pawn,
-                color,
+                side: color,
             },
         );
     }

@@ -1,10 +1,25 @@
+use core::panic;
 use std::todo;
 
 use crate::{
-    board::{Action, Board, MoveError},
+    board::{Action, Board},
     coordinates::Position,
     piece::{Piece, get_startup_pieces_black, get_startup_pieces_white},
 };
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+pub enum MoveError {
+    #[error("no piece at source position")]
+    NoPieceAtPosition,
+
+    #[error("destination is not reachable")]
+    IllegalMove,
+
+    #[error("piece belongs to the other player")]
+    WrongPlayer,
+}
+type Result<T> = std::result::Result<T, MoveError>;
 
 pub mod board;
 pub mod coordinates;
@@ -45,24 +60,41 @@ impl Game {
         }
     }
 
-    pub fn make_move(
-        &mut self,
-        origin: Position,
-        destination: Position,
-    ) -> Result<Move, MoveError> {
+    /// Make a move on the board. Move must be valid, otherwise an error will be returned
+    pub fn make_move(&mut self, origin: Position, destination: Position) -> Result<Move> {
+        use MoveError::*;
+
+        let piece = self.board.pieces.get(&origin).ok_or(NoPieceAtPosition)?;
+
+        if piece.side != self.active_side {
+            return Err(WrongPlayer);
+        }
+
         let options = self.board.get_movement_options(origin)?;
 
         let valid_move = options
             .iter()
             .find(|option| option.pos == destination)
-            .ok_or(MoveError::IllegalMove)?;
+            .ok_or(IllegalMove)?;
 
-        match valid_move.action {
+        let move_ = match valid_move.action {
+            Action::Move => {
+                let piece = self.board.pieces.remove(&origin).expect("No piece ???");
+                let piece_clone = piece.clone();
+                assert!(self.board.pieces.insert(destination, piece).is_none());
+                Move {
+                    piece: piece_clone,
+                    origin,
+                    destination,
+                    action: valid_move.action,
+                }
+            }
             Action::Capture => todo!(),
-            Action::Move => todo!(),
+
             Action::Promote => todo!(),
             Action::CaptureEnPassant => todo!(),
-        }
+        };
+        Ok(move_)
     }
 
     pub fn board(&self) -> &Board {

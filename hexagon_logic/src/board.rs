@@ -1,26 +1,12 @@
 use super::piece::Piece;
 use std::collections::HashMap;
-use thiserror::Error;
 
 use crate::{
+    MoveError, Result, Side,
     coordinates::{BOARD_DIM, Position},
     movement::{MovementPattern, get_movement_patterns},
-    piece::{BLACK_PAWNS_STARTING_POSITIONS, Color, WHITE_PAWNS_STARTING_POSITIONS},
+    piece::{BLACK_PAWNS_STARTING_POSITIONS, WHITE_PAWNS_STARTING_POSITIONS},
 };
-
-#[derive(Debug, Error)]
-pub enum MoveError {
-    #[error("no piece at source position")]
-    NoPieceAtPosition,
-
-    #[error("destination is not reachable")]
-    IllegalMove,
-
-    #[error("piece belongs to the other player")]
-    WrongPlayer,
-}
-
-type Result<T> = std::result::Result<T, MoveError>;
 
 pub enum Marker {
     MovementOption,
@@ -93,7 +79,7 @@ impl Board {
         }
 
         if let Some(piece) = self.pieces.get(&pos) {
-            if piece.color() == me.color() {
+            if piece.side() == me.side() {
                 return None;
             } else {
                 return Some(MoveOption {
@@ -115,8 +101,8 @@ impl Board {
     // The pawn is a special case and therefore has its own function
     fn get_pawn_moves(&self, me: &Piece, pos: Position) -> Vec<MoveOption> {
         let mut options = Vec::new();
-        let color = me.color;
-        let orientation = if color == Color::White { 1 } else { -1 };
+        let color = me.side;
+        let orientation = if color == Side::White { 1 } else { -1 };
         let direction = (0, orientation);
 
         // --- the normal step of the figure
@@ -124,8 +110,8 @@ impl Board {
 
         // --- walk two steps from starting position
         let starting_positions = match color {
-            Color::White => WHITE_PAWNS_STARTING_POSITIONS,
-            Color::Black => BLACK_PAWNS_STARTING_POSITIONS,
+            Side::White => WHITE_PAWNS_STARTING_POSITIONS,
+            Side::Black => BLACK_PAWNS_STARTING_POSITIONS,
         };
 
         if starting_positions.contains(&pos) {
@@ -134,8 +120,8 @@ impl Board {
 
         // --- capture diagonally
         let capture_moves = match color {
-            Color::White => &[(1, 0), (-1, 1)],
-            Color::Black => &[(-1, 0), (1, -1)],
+            Side::White => &[(1, 0), (-1, 1)],
+            Side::Black => &[(-1, 0), (1, -1)],
         };
 
         for (dy, dx) in capture_moves {
@@ -196,7 +182,7 @@ mod tests {
         let pos = Position::try_from(('F', 5)).expect("invalid position");
         let piece = Piece {
             piece_type: PieceType::Rook,
-            color: Color::Black,
+            side: Color::Black,
         };
         board.pieces.insert(pos, piece);
 
