@@ -43,7 +43,7 @@ impl BoardDisplay for ChessTerminal {
 
         let mut columns = EDGE_LEN;
         let mut space_count = 0isize;
-        for y in 0..BOARD_DIM {
+        for (y, x_range) in X_RANGE.iter().enumerate() {
             let inc: isize = if y < BOARD_DIM / 2 { 1 } else { -1 };
 
             let nr_spaces = (INITIAL_X_OFFSET - space_count * 3) as usize;
@@ -51,9 +51,8 @@ impl BoardDisplay for ChessTerminal {
             let char_notation = num_to_char_notation(y)?;
             execute!(out, Print(whitespace), Print(format!("{char_notation}  ")))?;
 
-            let x_range = X_RANGE[y];
             for x in x_range.0..=x_range.1 {
-                let pos = Position { y: y, x };
+                let pos = Position { y, x };
                 print_cell(board, pos, &mut out)?;
             }
             print_diagonal_column_label(&mut out, y)?;

@@ -29,7 +29,8 @@ pub struct Position {
 }
 
 impl Position {
-    pub fn is_in_field(&self) -> bool {
+    /// Returns true if this position is inside the board boundaries
+    pub fn is_on_board(&self) -> bool {
         if self.y > BOARD_DIM - 1 {
             return false;
         }

@@ -1,4 +1,3 @@
-use core::panic;
 use std::todo;
 
 use crate::{
@@ -10,6 +9,9 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum MoveError {
+    #[error("Given position {0} is outside of the board")]
+    OutsideBoard(Position),
+
     #[error("no piece at source position")]
     NoPieceAtPosition,
 

@@ -43,6 +43,9 @@ pub struct Board {
 
 impl Board {
     pub fn get_movement_options(&self, pos: Position) -> Result<Vec<MoveOption>> {
+        if !pos.is_on_board() {
+            return Err(MoveError::OutsideBoard(pos));
+        }
         let me = self.pieces.get(&pos).ok_or(MoveError::NoPieceAtPosition)?;
 
         let mut moves = Vec::new();
@@ -74,7 +77,7 @@ impl Board {
         };
 
         let pos = Position { y, x };
-        if !pos.is_in_field() {
+        if !pos.is_on_board() {
             return None;
         }
 
