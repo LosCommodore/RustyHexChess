@@ -91,7 +91,17 @@ impl Game {
                     action: valid_move.action,
                 }
             }
-            Action::Capture => todo!(),
+            Action::Capture => {
+                let piece = self.board.pieces.remove(&origin).expect("No piece ???");
+                let piece_clone = piece.clone();
+                assert!(self.board.pieces.insert(destination, piece).is_some());
+                Move {
+                    piece: piece_clone,
+                    origin,
+                    destination,
+                    action: valid_move.action,
+                }
+            }
 
             Action::Promote => todo!(),
             Action::CaptureEnPassant => todo!(),

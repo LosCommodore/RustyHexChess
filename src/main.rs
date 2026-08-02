@@ -24,10 +24,7 @@ where
     Ok(())
 }
 
-fn main() -> Result<()> {
-    ChessTerminal::clc()?;
-
-    let mut game = Game::new();
+fn config_a_board() -> Result<Board> {
     let mut board = Board::default();
 
     let white_pieces = get_startup_pieces_white();
@@ -50,9 +47,15 @@ fn main() -> Result<()> {
     //board.pieces.insert(king_pos, king);
     //board.pieces.insert(piece_pos, piece);
     let options = show_options(&mut board, ('F', 5));
+    Ok(board)
+}
 
+fn main() -> Result<()> {
+    ChessTerminal::clc()?;
+    let mut game = Game::new();
     let terminal = ChessTerminal;
-    terminal.display(&board)?;
 
+    game.make_move(Position { y: 1, x: 4 }, Position { y: 1, x: 5 })?;
+    terminal.display(game.board())?;
     Ok(())
 }
