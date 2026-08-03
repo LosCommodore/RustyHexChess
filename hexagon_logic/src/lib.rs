@@ -1,9 +1,5 @@
-use std::todo;
-
 use crate::{
-    board::{Action, Board},
-    coordinates::Position,
-    piece::{Piece, get_startup_pieces_black, get_startup_pieces_white},
+    board::{Action, Board, MoveOption}, coordinates::Position, piece::{BLACK_PAWNS_PROMOTION_POSITIONS, Piece, PieceType, WHITE_PAWNS_PROMOTION_POSITIONS, get_startup_pieces_black, get_startup_pieces_white},
 };
 use thiserror::Error;
 
@@ -66,47 +62,66 @@ impl Game {
     pub fn make_move(&mut self, origin: Position, destination: Position) -> Result<Move> {
         use MoveError::*;
 
-        let piece = self.board.pieces.get(&origin).ok_or(NoPieceAtPosition)?;
-
-        if piece.side != self.active_side {
+        let piece_clone = self.board.pieces.get(&origin).ok_or(NoPieceAtPosition)?.clone();
+        
+        if piece_clone.side != self.active_side {
             return Err(WrongPlayer);
         }
 
         let options = self.board.get_movement_options(origin)?;
+
+        // todo: add en passant here -> extend movement options for pawn.
 
         let valid_move = options
             .iter()
             .find(|option| option.pos == destination)
             .ok_or(IllegalMove)?;
 
-        let move_ = match valid_move.action {
+        match valid_move.action {
             Action::Move => {
                 let piece = self.board.pieces.remove(&origin).expect("No piece ???");
-                let piece_clone = piece.clone();
                 assert!(self.board.pieces.insert(destination, piece).is_none());
-                Move {
-                    piece: piece_clone,
-                    origin,
-                    destination,
-                    action: valid_move.action,
-                }
             }
             Action::Capture => {
                 let piece = self.board.pieces.remove(&origin).expect("No piece ???");
-                let piece_clone = piece.clone();
                 assert!(self.board.pieces.insert(destination, piece).is_some());
-                Move {
-                    piece: piece_clone,
-                    origin,
-                    destination,
-                    action: valid_move.action,
-                }
+       
             }
-
-            Action::Promote => todo!(),
-            Action::CaptureEnPassant => todo!(),
         };
+
+        let move_ = Move {
+            piece: piece_clone.clone(),
+            origin,
+            destination,
+            action: valid_move.action,
+        };
+
+        if piece_clone.piece_type == PieceType::Pawn {
+            let promotion_fields = match piece_clone.side {
+                Side::Black => BLACK_PAWNS_PROMOTION_POSITIONS,
+                Side::White => WHITE_PAWNS_PROMOTION_POSITIONS,
+            };
+
+            let is_promotion = promotion_fields.iter().any(|x| *x == destination);
+            if is_promotion {
+                println!("You are promoted !")
+            }
+        }
+    
+        self.next_turn();
         Ok(move_)
+    }
+
+    pub fn get_movement_options(&self, pos: Position) -> Result<Vec<MoveOption>> {
+        self.board.get_movement_options(pos)
+    }
+
+    pub fn next_turn(&mut self) {
+        self.active_side = match self.active_side {
+             Side::Black => Side::White,
+             Side::White => Side::Black,
+        };
+        
     }
 
     pub fn board(&self) -> &Board {

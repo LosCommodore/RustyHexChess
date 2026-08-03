@@ -56,6 +56,7 @@ fn main() -> Result<()> {
     let terminal = ChessTerminal;
 
     game.make_move(Position { y: 1, x: 4 }, Position { y: 1, x: 5 })?;
+    //game.make_move(Position { y: 1, x: 5 }, Position { y: 1, x: 6 })?;
     terminal.display(game.board())?;
     Ok(())
 }

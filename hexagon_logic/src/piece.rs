@@ -28,6 +28,37 @@ pub const BLACK_PAWNS_STARTING_POSITIONS: [Position; 9] = [
     Position { y: 9, x: 6 },  // ('J', 7)
 ];
 
+
+pub const WHITE_PAWNS_PROMOTION_POSITIONS: [Position; 11] = [
+    Position { y: 0, x: 10 },
+    Position { y: 1, x: 10 },
+    Position { y: 2, x: 10 },
+    Position { y: 3, x: 10 },
+    Position { y: 4, x: 10 },
+    Position { y: 5, x: 10 },
+    Position { y: 6, x: 9 },
+    Position { y: 7, x: 8 },
+    Position { y: 8, x: 7 },
+    Position { y: 9, x: 6 },
+    Position { y: 10, x: 5 },
+];
+
+
+pub const BLACK_PAWNS_PROMOTION_POSITIONS: [Position; 11] = [
+    Position { y: 0, x: 5 },
+    Position { y: 1, x: 4 },
+    Position { y: 2, x: 3 },
+    Position { y: 3, x: 2 },
+    Position { y: 4, x: 1 },
+    Position { y: 5, x: 0 },
+    Position { y: 6, x: 0 },
+    Position { y: 7, x: 0 },
+    Position { y: 8, x: 0 },
+    Position { y: 9, x: 0 },
+    Position { y: 10, x: 0 },
+];
+
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Piece {
     pub piece_type: PieceType,

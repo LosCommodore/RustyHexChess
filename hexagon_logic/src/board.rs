@@ -25,8 +25,6 @@ pub enum Marker {
 pub enum Action {
     Move,
     Capture,
-    CaptureEnPassant,
-    Promote,
 }
 
 #[derive(Clone, Copy, Debug)]
