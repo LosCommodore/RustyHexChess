@@ -77,7 +77,6 @@ pub fn write_board(board: &Board, out: &mut impl Write) -> Result<()> {
             print_cell(board, pos, out)?;
         }
         print_diagonal_column_label(out, y)?;
-        //execute!(out, MoveToNextLine(1))?;
         write!(out, "\r\n")?;
 
         space_count += inc;
@@ -97,17 +96,6 @@ pub fn write_html(board: &Board, out: &mut impl Write) -> Result<()> {
 
     let html_content = convert(&ansi_string)
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
-
-    /*
-    let final_html = format!(
-        r#"<div style="white-space: pre-wrap; font-family: monospace;">
-            {}
-        </div>"#,
-        html_content
-    );
-    */
-
-    //let final_html = final_html.replace("\n", "<br>");
 
     write!(
         out,
