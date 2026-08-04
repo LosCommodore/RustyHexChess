@@ -48,7 +48,9 @@ impl BoardDisplay for ChessTerminal {
 
             let nr_spaces = (INITIAL_X_OFFSET - space_count * 3) as usize;
             let whitespace = " ".repeat(nr_spaces);
-            let char_notation = num_to_char_notation(y)?;
+            let Some(char_notation) = num_to_char_notation(y) else {
+                anyhow::bail!("Invalid conversion to char");
+            };
             execute!(out, Print(whitespace), Print(format!("{char_notation}  ")))?;
 
             for x in x_range.0..=x_range.1 {

@@ -1,6 +1,8 @@
 #![allow(unused)]
 
 mod display;
+use std::error::Error;
+
 use hexagon_logic::{
     Game, Side,
     board::{Board, Marker},
@@ -9,14 +11,17 @@ use hexagon_logic::{
 };
 
 use crate::display::{BoardDisplay, ChessTerminal};
+use anyhow::Context;
 use anyhow::Result;
+use anyhow::anyhow;
 
 fn show_options<T>(board: &mut Board, piece_pos: T) -> Result<()>
 where
-    T: TryInto<Position>,
-    T::Error: Into<anyhow::Error>,
+    T: TryInto<Position, Error = ()>,
 {
-    let pos = piece_pos.try_into().map_err(Into::into)?;
+    let pos = piece_pos
+        .try_into()
+        .map_err(|_| anyhow!("Invalid position"))?;
     let options = board.get_movement_options(pos)?;
     for p in options {
         board.markers.insert(p.pos, Marker::MovementOption);
@@ -30,13 +35,14 @@ fn config_a_board() -> Result<Board> {
     let white_pieces = get_startup_pieces_white();
     let black_pieces = get_startup_pieces_black();
 
-    let piece_pos = Position::try_from(('D', 6))?;
+    let piece_pos = Position::try_from(('D', 6)).ok().context("Invalid pos")?;
+
     let piece = Piece {
         piece_type: PieceType::Knight,
         side: Side::Black,
     };
 
-    let king_pos = Position::try_from(('H', 6))?;
+    let king_pos = Position::try_from(('H', 6)).ok().context("Invalid pos");
     let king = Piece {
         piece_type: PieceType::King,
         side: Side::Black,
@@ -55,7 +61,7 @@ fn main() -> Result<()> {
     let mut game = Game::new();
     let terminal = ChessTerminal;
 
-    game.make_move(Position { y: 1, x: 4 }, Position { y: 1, x: 5 })?;
+    game.make_move(('B', 5), Position { y: 1, x: 5 })?;
     //game.make_move(Position { y: 1, x: 5 }, Position { y: 1, x: 6 })?;
     terminal.display(game.board())?;
     Ok(())

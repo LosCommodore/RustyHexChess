@@ -171,11 +171,9 @@ impl Board {
 
 #[cfg(test)]
 mod tests {
-    use std::println;
-
     use super::*;
-
-    use crate::game::piece::{self, Color, Piece, PieceType};
+    use crate::piece::PieceType;
+    use std::println;
 
     #[test]
     fn test_move_rook() {
@@ -183,7 +181,7 @@ mod tests {
         let pos = Position::try_from(('F', 5)).expect("invalid position");
         let piece = Piece {
             piece_type: PieceType::Rook,
-            side: Color::Black,
+            side: Side::Black,
         };
         board.pieces.insert(pos, piece);
 

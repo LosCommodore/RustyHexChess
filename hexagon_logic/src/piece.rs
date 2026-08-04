@@ -28,7 +28,6 @@ pub const BLACK_PAWNS_STARTING_POSITIONS: [Position; 9] = [
     Position { y: 9, x: 6 },  // ('J', 7)
 ];
 
-
 pub const WHITE_PAWNS_PROMOTION_POSITIONS: [Position; 11] = [
     Position { y: 0, x: 10 },
     Position { y: 1, x: 10 },
@@ -43,7 +42,6 @@ pub const WHITE_PAWNS_PROMOTION_POSITIONS: [Position; 11] = [
     Position { y: 10, x: 5 },
 ];
 
-
 pub const BLACK_PAWNS_PROMOTION_POSITIONS: [Position; 11] = [
     Position { y: 0, x: 5 },
     Position { y: 1, x: 4 },
@@ -57,7 +55,6 @@ pub const BLACK_PAWNS_PROMOTION_POSITIONS: [Position; 11] = [
     Position { y: 9, x: 0 },
     Position { y: 10, x: 0 },
 ];
-
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Piece {
@@ -102,9 +99,9 @@ pub fn get_startup_pieces_black() -> HashMap<Position, Piece> {
     let color = Side::Black;
     let mut out = HashMap::new();
 
-    let mut insert = |pos: HumanCoordinates, piece_type: PieceType| -> Result<()> {
+    let mut insert = |pos: HumanCoordinate, piece_type: PieceType| -> Result<()> {
         out.insert(
-            Position::try_from(pos)?,
+            Position::try_from(pos).expect("invalid starting positions ??"),
             Piece {
                 piece_type,
                 side: color,
@@ -139,9 +136,9 @@ pub fn get_startup_pieces_white() -> HashMap<Position, Piece> {
     let color = Side::White;
 
     let mut out = HashMap::new();
-    let mut insert = |pos: HumanCoordinates, piece_type: PieceType| -> Result<()> {
+    let mut insert = |pos: HumanCoordinate, piece_type: PieceType| -> Result<()> {
         out.insert(
-            Position::try_from(pos)?,
+            Position::try_from(pos).expect("invalid starting positions ??"),
             Piece {
                 piece_type,
                 side: color,

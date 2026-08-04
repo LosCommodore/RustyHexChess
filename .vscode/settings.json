@@ -8,5 +8,8 @@
   "cSpell.words": [
     "crossterm",
     "thiserror"
+  ],
+  "rust-analyzer.linkedProjects": [
+    "./hexagon_logic/Cargo.toml"
   ]
 }

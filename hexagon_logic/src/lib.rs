@@ -1,5 +1,10 @@
 use crate::{
-    board::{Action, Board, MoveOption}, coordinates::Position, piece::{BLACK_PAWNS_PROMOTION_POSITIONS, Piece, PieceType, WHITE_PAWNS_PROMOTION_POSITIONS, get_startup_pieces_black, get_startup_pieces_white},
+    board::{Action, Board, MoveOption},
+    coordinates::Position,
+    piece::{
+        BLACK_PAWNS_PROMOTION_POSITIONS, Piece, PieceType, WHITE_PAWNS_PROMOTION_POSITIONS,
+        get_startup_pieces_black, get_startup_pieces_white,
+    },
 };
 use thiserror::Error;
 
@@ -16,6 +21,9 @@ pub enum MoveError {
 
     #[error("piece belongs to the other player")]
     WrongPlayer,
+
+    #[error("invalid position")]
+    InvalidPosition,
 }
 type Result<T> = std::result::Result<T, MoveError>;
 
@@ -59,11 +67,24 @@ impl Game {
     }
 
     /// Make a move on the board. Move must be valid, otherwise an error will be returned
-    pub fn make_move(&mut self, origin: Position, destination: Position) -> Result<Move> {
+    pub fn make_move<T, U>(&mut self, origin: T, destination: U) -> Result<Move>
+    where
+        T: TryInto<Position>,
+        T::Error: std::fmt::Debug, // Accepts () or Infallible or any Debug type
+        U: TryInto<Position>,
+        U::Error: std::fmt::Debug,
+    {
         use MoveError::*;
+        let origin = origin.try_into().map_err(|_| InvalidPosition)?;
+        let destination = destination.try_into().map_err(|_| InvalidPosition)?;
 
-        let piece_clone = self.board.pieces.get(&origin).ok_or(NoPieceAtPosition)?.clone();
-        
+        let piece_clone = self
+            .board
+            .pieces
+            .get(&origin)
+            .ok_or(NoPieceAtPosition)?
+            .clone();
+
         if piece_clone.side != self.active_side {
             return Err(WrongPlayer);
         }
@@ -85,7 +106,6 @@ impl Game {
             Action::Capture => {
                 let piece = self.board.pieces.remove(&origin).expect("No piece ???");
                 assert!(self.board.pieces.insert(destination, piece).is_some());
-       
             }
         };
 
@@ -107,7 +127,7 @@ impl Game {
                 println!("You are promoted !")
             }
         }
-    
+
         self.next_turn();
         Ok(move_)
     }
@@ -118,10 +138,9 @@ impl Game {
 
     pub fn next_turn(&mut self) {
         self.active_side = match self.active_side {
-             Side::Black => Side::White,
-             Side::White => Side::Black,
+            Side::Black => Side::White,
+            Side::White => Side::Black,
         };
-        
     }
 
     pub fn board(&self) -> &Board {
