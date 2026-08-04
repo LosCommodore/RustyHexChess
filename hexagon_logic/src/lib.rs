@@ -29,6 +29,7 @@ type Result<T> = std::result::Result<T, MoveError>;
 
 pub mod board;
 pub mod coordinates;
+pub mod display;
 mod movement;
 pub mod piece;
 
