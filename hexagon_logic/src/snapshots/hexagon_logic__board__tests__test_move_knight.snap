@@ -1,0 +1,91 @@
+---
+source: hexagon_logic/src/board.rs
+assertion_line: 215
+expression: options
+---
+[
+    MoveOption {
+        pos: Position {
+            y: 7,
+            x: 5,
+        },
+        action: Move,
+    },
+    MoveOption {
+        pos: Position {
+            y: 6,
+            x: 6,
+        },
+        action: Move,
+    },
+    MoveOption {
+        pos: Position {
+            y: 8,
+            x: 3,
+        },
+        action: Move,
+    },
+    MoveOption {
+        pos: Position {
+            y: 8,
+            x: 2,
+        },
+        action: Move,
+    },
+    MoveOption {
+        pos: Position {
+            y: 6,
+            x: 1,
+        },
+        action: Move,
+    },
+    MoveOption {
+        pos: Position {
+            y: 7,
+            x: 1,
+        },
+        action: Move,
+    },
+    MoveOption {
+        pos: Position {
+            y: 3,
+            x: 3,
+        },
+        action: Move,
+    },
+    MoveOption {
+        pos: Position {
+            y: 4,
+            x: 2,
+        },
+        action: Move,
+    },
+    MoveOption {
+        pos: Position {
+            y: 2,
+            x: 5,
+        },
+        action: Move,
+    },
+    MoveOption {
+        pos: Position {
+            y: 2,
+            x: 6,
+        },
+        action: Move,
+    },
+    MoveOption {
+        pos: Position {
+            y: 4,
+            x: 7,
+        },
+        action: Move,
+    },
+    MoveOption {
+        pos: Position {
+            y: 3,
+            x: 7,
+        },
+        action: Move,
+    },
+]

@@ -266,6 +266,6 @@ mod tests {
             piece_type: PieceType::Pawn,
             side: Side::Black,
         };
-        move_piece(('F', 5), &piece, "test_move_knight");
+        move_piece(('F', 5), &piece, "test_move_pawn");
     }
 }
