@@ -8,3 +8,6 @@ ansi-to-html = "0.2.3"
 anyhow = "1.0.103"
 crossterm = "0.29.0"
 thiserror = "2.0.19"
+
+[dev-dependencies]
+insta = "1.48.0"

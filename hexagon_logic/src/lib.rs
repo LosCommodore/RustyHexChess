@@ -135,6 +135,7 @@ impl Game {
 
     pub fn get_movement_options(&self, pos: Position) -> Result<Vec<MoveOption>> {
         self.board.get_movement_options(pos)
+        // todo -> add en passant
     }
 
     pub fn next_turn(&mut self) {
@@ -147,5 +148,15 @@ impl Game {
     pub fn board(&self) -> &Board {
         &self.board
     }
-    //pub fn possible_moves(...) -> Vec<Move>;
+
+    pub fn mark_move_options<T>(&mut self, pos: T) -> Result<()>
+    where
+        T: TryInto<Position>,
+        T::Error: std::fmt::Debug, // Accepts () or Infallible or any Debug type
+    {
+        let pos = pos.try_into().map_err(|_| MoveError::InvalidPosition)?;
+        let move_options = self.get_movement_options(pos)?;
+        self.board.mark_move_options(&move_options);
+        Ok(())
+    }
 }

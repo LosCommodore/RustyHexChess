@@ -167,23 +167,41 @@ impl Board {
         }
         options
     }
+
+    pub fn mark_move_options(&mut self, options: &[MoveOption]) {
+        self.markers.clear();
+
+        for MoveOption { pos, action: _ } in options {
+            self.markers.insert(*pos, Marker::MovementOption);
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::coordinates::HumanCoordinate;
+    use crate::display::save_board_to_html_file;
     use crate::piece::PieceType;
-    use std::println;
+    use std::path::PathBuf;
 
-    #[test]
-    fn test_move_rook() {
+    fn snap_board(board: &Board, snapshot_name: &str) {
+        let path = get_html_repr_path(snapshot_name);
+        save_board_to_html_file(board, path).expect("html could not be generated");
+    }
+
+    fn get_html_repr_path(snapshot_name: &str) -> PathBuf {
+        let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        path.push("src");
+        path.push("snapshots");
+        path.push(format!("{snapshot_name}.html"));
+        path
+    }
+
+    fn move_piece(pos: HumanCoordinate, piece: &Piece, snapshot_name: &str) {
         let mut board = Board::default();
-        let pos = Position::try_from(('F', 5)).expect("invalid position");
-        let piece = Piece {
-            piece_type: PieceType::Rook,
-            side: Side::Black,
-        };
-        board.pieces.insert(pos, piece);
+        let pos = Position::try_from(pos).expect("invalid position");
+        board.pieces.insert(pos, piece.clone());
 
         let internal_pos = pos;
 
@@ -192,5 +210,62 @@ mod tests {
             .expect("error on movement options");
 
         println!("{options:#?}");
+        board.mark_move_options(&options);
+        snap_board(&board, snapshot_name);
+        insta::assert_debug_snapshot!(snapshot_name, options);
+    }
+
+    #[test]
+    fn test_move_rook() {
+        let piece = Piece {
+            piece_type: PieceType::Rook,
+            side: Side::Black,
+        };
+        move_piece(('F', 5), &piece, "test_move_rook");
+    }
+
+    #[test]
+    fn test_move_queen() {
+        let piece = Piece {
+            piece_type: PieceType::Queen,
+            side: Side::Black,
+        };
+        move_piece(('F', 5), &piece, "test_move_queen");
+    }
+
+    #[test]
+    fn test_move_king() {
+        let piece = Piece {
+            piece_type: PieceType::King,
+            side: Side::Black,
+        };
+        move_piece(('F', 5), &piece, "test_move_king");
+    }
+
+    #[test]
+    fn test_move_bishop() {
+        let piece = Piece {
+            piece_type: PieceType::Bishop,
+            side: Side::Black,
+        };
+        move_piece(('F', 5), &piece, "test_move_bishop");
+    }
+
+    #[test]
+    fn test_move_knight() {
+        let piece = Piece {
+            piece_type: PieceType::Knight,
+            side: Side::Black,
+        };
+        move_piece(('F', 5), &piece, "test_move_knight");
+    }
+
+    #[test]
+    fn test_move_pawn() {
+        let piece = Piece {
+            piece_type: PieceType::Pawn,
+            side: Side::Black,
+        };
+        move_piece(('F', 5), &piece, "test_move_knight");
     }
 }
