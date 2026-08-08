@@ -38,6 +38,12 @@ pub struct Board {
     pub markers: HashMap<Position, Marker>,
 }
 
+pub enum Capability {
+    Both, // move or capture
+    Capture,
+    Move,
+}
+
 impl Board {
     pub fn get_movement_options(&self, pos: Position) -> Result<Vec<MoveOption>> {
         if !pos.is_on_board() {
@@ -61,10 +67,10 @@ impl Board {
     pub fn is_movement_option(
         &self,
         pos: &Position,
-        me: &Piece,
+        my_side: Side,
         dy: isize,
         dx: isize,
-        capture_only: bool, // move only allowed if a piece is captured (used for pawn)
+        capture_mode: Capability,
     ) -> Option<MoveOption> {
         let Some(y) = pos.y.checked_add_signed(dy) else {
             return None;
@@ -79,23 +85,28 @@ impl Board {
         }
 
         if let Some(piece) = self.pieces.get(&pos) {
-            if piece.side() == me.side() {
+            if piece.side() == my_side {
                 return None;
             } else {
-                return Some(MoveOption {
-                    pos,
-                    action: Action::Capture,
-                });
+                match capture_mode {
+                    Capability::Move => return None,
+                    _ => {
+                        return Some(MoveOption {
+                            pos,
+                            action: Action::Capture,
+                        });
+                    }
+                }
             };
         }
 
-        if capture_only {
-            return None;
+        match capture_mode {
+            Capability::Capture => None,
+            _ => Some(MoveOption {
+                pos: pos,
+                action: Action::Move,
+            }),
         }
-        Some(MoveOption {
-            pos: pos,
-            action: Action::Move,
-        })
     }
 
     // The pawn is a special case and therefore has its own function
@@ -125,7 +136,7 @@ impl Board {
         };
 
         for (dy, dx) in capture_moves {
-            let option = self.is_movement_option(&pos, me, *dy, *dx, true);
+            let option = self.is_movement_option(&pos, me.side, *dy, *dx, Capability::Capture);
             options.extend(option);
         }
         options
@@ -141,7 +152,7 @@ impl Board {
         let mut options = Vec::new();
 
         for (dy, dx) in steps {
-            let option = self.is_movement_option(&pos, me, *dy, *dx, false);
+            let option = self.is_movement_option(&pos, me.side, *dy, *dx, Capability::Both);
             options.extend(option);
         }
 
@@ -158,7 +169,8 @@ impl Board {
     ) -> Vec<MoveOption> {
         let mut options = Vec::new();
         for _ in 0..nr_steps.unwrap_or(BOARD_DIM) {
-            let Some(new_move) = self.is_movement_option(&pos, me, dy, dx, false) else {
+            let Some(new_move) = self.is_movement_option(&pos, me.side, dy, dx, Capability::Both)
+            else {
                 return options;
             };
             options.push(new_move);
