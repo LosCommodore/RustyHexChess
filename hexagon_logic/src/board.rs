@@ -20,7 +20,7 @@ pub enum Marker {
 ///      then it is also allowed to move two vacant cells vertically forward.
 ///   2. It may capture one cell orthogonally forward at a 60° angle to the vertical, including capturing en passant.
 ///   3. It is promoted when it reaches the end of any file.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Action {
     Move,
     Capture,
@@ -175,6 +175,10 @@ impl Board {
                 return options;
             };
             options.push(new_move);
+            if new_move.action == Action::Capture {
+                break;
+            }
+
             pos = new_move.pos;
         }
         options
@@ -323,5 +327,61 @@ mod tests {
             };
             mark_and_snap(&mut board, &start, &format!("test_move_all_{name}_pawns"));
         }
+    }
+
+    #[test]
+    fn test_capture_with_pawn() {
+        let mut board = Board::default();
+        let pos = ('F', 5).try_into().unwrap();
+        board.pieces.insert(
+            pos,
+            Piece {
+                piece_type: PieceType::Pawn,
+                side: Side::White,
+            },
+        );
+        board.pieces.insert(
+            ('G', 5).try_into().unwrap(),
+            Piece {
+                piece_type: PieceType::Bishop,
+                side: Side::Black,
+            },
+        );
+        board.pieces.insert(
+            ('E', 6).try_into().unwrap(),
+            Piece {
+                piece_type: PieceType::Queen,
+                side: Side::Black,
+            },
+        );
+        mark_and_snap(&mut board, &[pos], &format!("test_capture_with_pawn"));
+    }
+
+    #[test]
+    fn test_normal_capture() {
+        let mut board = Board::default();
+        let pos = ('F', 5).try_into().unwrap();
+        board.pieces.insert(
+            pos,
+            Piece {
+                piece_type: PieceType::Queen,
+                side: Side::White,
+            },
+        );
+        board.pieces.insert(
+            ('F', 8).try_into().unwrap(),
+            Piece {
+                piece_type: PieceType::King,
+                side: Side::Black,
+            },
+        );
+        board.pieces.insert(
+            ('I', 8).try_into().unwrap(),
+            Piece {
+                piece_type: PieceType::King,
+                side: Side::White,
+            },
+        );
+        mark_and_snap(&mut board, &[pos], &format!("test_normal_capture"));
     }
 }
