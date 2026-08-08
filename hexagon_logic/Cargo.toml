@@ -4,10 +4,11 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-ansi-to-html = "0.2.3"
-anyhow = "1.0.103"
-crossterm = "0.29.0"
+strum = { version = "0.26", features = ["derive"] }
 thiserror = "2.0.19"
 
 [dev-dependencies]
 insta = "1.48.0"
+ansi-to-html = "0.2.3"
+anyhow = "1.0.103"
+crossterm = "0.29.0"

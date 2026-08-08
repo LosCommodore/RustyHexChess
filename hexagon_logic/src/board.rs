@@ -7,7 +7,7 @@ use crate::{
     movement::{MovementPattern, get_movement_patterns},
     piece::{BLACK_PAWNS_STARTING_POSITIONS, WHITE_PAWNS_STARTING_POSITIONS},
 };
-
+use strum::IntoEnumIterator;
 pub enum Marker {
     MovementOption,
 }
@@ -179,6 +179,8 @@ impl Board {
 
 #[cfg(test)]
 mod tests {
+    use crossterm::style::Color::{Black, White};
+
     use super::*;
     use crate::coordinates::HumanCoordinate;
     use crate::display::save_board_to_html_file;
@@ -198,21 +200,27 @@ mod tests {
         path
     }
 
-    fn move_piece(pos: HumanCoordinate, piece: &Piece, snapshot_name: &str) {
-        let mut board = Board::default();
-        let pos = Position::try_from(pos).expect("invalid position");
-        board.pieces.insert(pos, piece.clone());
+    fn mark_and_snap(board: &mut Board, positions: &[Position], snapshot_name: &str) {
+        let mut options = Vec::new();
 
-        let internal_pos = pos;
-
-        let options = board
-            .get_movement_options(internal_pos)
-            .expect("error on movement options");
-
-        println!("{options:#?}");
+        for p in positions {
+            options.extend(
+                board
+                    .get_movement_options(p.clone())
+                    .expect("error on movement options"),
+            );
+        }
         board.mark_move_options(&options);
         snap_board(&board, snapshot_name);
         insta::assert_debug_snapshot!(snapshot_name, options);
+    }
+
+    fn move_piece(pos: HumanCoordinate, piece: &Piece, snapshot_name: &str) -> Board {
+        let mut board = Board::default();
+        let pos = Position::try_from(pos).expect("invalid position");
+        board.pieces.insert(pos, piece.clone());
+        mark_and_snap(&mut board, &[pos], snapshot_name);
+        board
     }
 
     #[test]
@@ -261,11 +269,47 @@ mod tests {
     }
 
     #[test]
-    fn test_move_pawn() {
+    fn test_move_pawn_black() {
         let piece = Piece {
             piece_type: PieceType::Pawn,
             side: Side::Black,
         };
-        move_piece(('F', 5), &piece, "test_move_pawn");
+        move_piece(('F', 5), &piece, "test_move_pawn_black");
+    }
+
+    #[test]
+    fn test_move_pawn_white() {
+        let piece = Piece {
+            piece_type: PieceType::Pawn,
+            side: Side::White,
+        };
+        move_piece(('F', 5), &piece, "test_move_pawn_white");
+    }
+
+    #[test]
+    fn test_move_all_pawns() {
+        let mut board = Board::default();
+        for side in Side::iter() {
+            let start = match side {
+                Side::White => WHITE_PAWNS_STARTING_POSITIONS,
+                Side::Black => BLACK_PAWNS_STARTING_POSITIONS,
+            };
+
+            for pos in start {
+                board.pieces.insert(
+                    pos,
+                    Piece {
+                        piece_type: PieceType::Pawn,
+                        side,
+                    },
+                );
+            }
+        }
+
+        mark_and_snap(
+            &mut board,
+            &WHITE_PAWNS_STARTING_POSITIONS,
+            "test_move_all_pawns",
+        );
     }
 }

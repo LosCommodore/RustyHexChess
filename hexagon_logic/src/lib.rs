@@ -6,7 +6,8 @@ use crate::{
         get_startup_pieces_black, get_startup_pieces_white,
     },
 };
-use thiserror::Error;
+use strum::EnumIter;
+use thiserror::Error; // Cleaned up unified import
 
 #[derive(Debug, Error)]
 pub enum MoveError {
@@ -33,7 +34,7 @@ pub mod display;
 mod movement;
 pub mod piece;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, EnumIter)]
 pub enum Side {
     #[default]
     White,
