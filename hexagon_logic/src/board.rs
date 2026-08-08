@@ -7,7 +7,6 @@ use crate::{
     movement::{MovementPattern, get_movement_patterns},
     piece::{BLACK_PAWNS_STARTING_POSITIONS, WHITE_PAWNS_STARTING_POSITIONS},
 };
-use strum::IntoEnumIterator;
 pub enum Marker {
     MovementOption,
 }
@@ -179,13 +178,12 @@ impl Board {
 
 #[cfg(test)]
 mod tests {
-    use crossterm::style::Color::{Black, White};
-
     use super::*;
     use crate::coordinates::HumanCoordinate;
     use crate::display::save_board_to_html_file;
     use crate::piece::PieceType;
     use std::path::PathBuf;
+    use strum::IntoEnumIterator;
 
     fn snap_board(board: &Board, snapshot_name: &str) {
         let path = get_html_repr_path(snapshot_name);
@@ -289,6 +287,7 @@ mod tests {
     #[test]
     fn test_move_all_pawns() {
         let mut board = Board::default();
+
         for side in Side::iter() {
             let start = match side {
                 Side::White => WHITE_PAWNS_STARTING_POSITIONS,
@@ -304,12 +303,12 @@ mod tests {
                     },
                 );
             }
-        }
 
-        mark_and_snap(
-            &mut board,
-            &WHITE_PAWNS_STARTING_POSITIONS,
-            "test_move_all_pawns",
-        );
+            let name = match side {
+                Side::White => "white",
+                Side::Black => "black",
+            };
+            mark_and_snap(&mut board, &start, &format!("test_move_all_{name}_pawns"));
+        }
     }
 }

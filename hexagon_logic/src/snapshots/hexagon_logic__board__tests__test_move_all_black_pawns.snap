@@ -1,62 +1,62 @@
 ---
 source: hexagon_logic/src/board.rs
-assertion_line: 215
+assertion_line: 213
 expression: options
 ---
 [
     MoveOption {
         pos: Position {
             y: 1,
-            x: 5,
+            x: 9,
         },
         action: Move,
     },
     MoveOption {
         pos: Position {
             y: 1,
-            x: 5,
+            x: 9,
         },
         action: Move,
     },
     MoveOption {
         pos: Position {
             y: 1,
-            x: 6,
+            x: 8,
         },
         action: Move,
     },
     MoveOption {
         pos: Position {
             y: 2,
-            x: 5,
+            x: 8,
         },
         action: Move,
     },
     MoveOption {
         pos: Position {
             y: 2,
-            x: 5,
+            x: 8,
         },
         action: Move,
     },
     MoveOption {
         pos: Position {
             y: 2,
-            x: 6,
+            x: 7,
         },
         action: Move,
     },
     MoveOption {
         pos: Position {
             y: 3,
-            x: 5,
+            x: 7,
         },
         action: Move,
     },
     MoveOption {
         pos: Position {
             y: 3,
-            x: 5,
+            x: 7,
         },
         action: Move,
     },
@@ -70,14 +70,7 @@ expression: options
     MoveOption {
         pos: Position {
             y: 4,
-            x: 5,
-        },
-        action: Move,
-    },
-    MoveOption {
-        pos: Position {
-            y: 4,
-            x: 5,
+            x: 6,
         },
         action: Move,
     },
@@ -85,6 +78,13 @@ expression: options
         pos: Position {
             y: 4,
             x: 6,
+        },
+        action: Move,
+    },
+    MoveOption {
+        pos: Position {
+            y: 4,
+            x: 5,
         },
         action: Move,
     },
@@ -105,21 +105,14 @@ expression: options
     MoveOption {
         pos: Position {
             y: 5,
-            x: 6,
+            x: 4,
         },
         action: Capture,
     },
     MoveOption {
         pos: Position {
             y: 6,
-            x: 4,
-        },
-        action: Move,
-    },
-    MoveOption {
-        pos: Position {
-            y: 6,
-            x: 4,
+            x: 5,
         },
         action: Move,
     },
@@ -132,15 +125,22 @@ expression: options
     },
     MoveOption {
         pos: Position {
-            y: 7,
-            x: 3,
+            y: 6,
+            x: 4,
         },
         action: Move,
     },
     MoveOption {
         pos: Position {
             y: 7,
-            x: 3,
+            x: 5,
+        },
+        action: Move,
+    },
+    MoveOption {
+        pos: Position {
+            y: 7,
+            x: 5,
         },
         action: Move,
     },
@@ -154,42 +154,42 @@ expression: options
     MoveOption {
         pos: Position {
             y: 8,
-            x: 2,
+            x: 5,
         },
         action: Move,
     },
     MoveOption {
         pos: Position {
             y: 8,
-            x: 2,
+            x: 5,
         },
         action: Move,
     },
     MoveOption {
         pos: Position {
             y: 8,
-            x: 3,
+            x: 4,
         },
         action: Move,
     },
     MoveOption {
         pos: Position {
             y: 9,
-            x: 1,
+            x: 5,
         },
         action: Move,
     },
     MoveOption {
         pos: Position {
             y: 9,
-            x: 1,
+            x: 5,
         },
         action: Move,
     },
     MoveOption {
         pos: Position {
             y: 9,
-            x: 2,
+            x: 4,
         },
         action: Move,
     },
