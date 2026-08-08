@@ -1,6 +1,6 @@
 ---
 source: hexagon_logic/src/board.rs
-assertion_line: 213
+assertion_line: 226
 expression: options
 ---
 [
@@ -101,13 +101,6 @@ expression: options
             x: 5,
         },
         action: Move,
-    },
-    MoveOption {
-        pos: Position {
-            y: 5,
-            x: 4,
-        },
-        action: Capture,
     },
     MoveOption {
         pos: Position {

@@ -38,8 +38,9 @@ pub struct Board {
     pub markers: HashMap<Position, Marker>,
 }
 
+#[derive(Clone, Copy, Debug)]
 pub enum Capability {
-    Both, // move or capture
+    Both,
     Capture,
     Move,
 }
@@ -55,7 +56,7 @@ impl Board {
         for p in get_movement_patterns(me.piece_type()) {
             match p {
                 MovementPattern::Walk { direction, limit } => {
-                    moves.extend(self.get_walk_moves(me, pos, *direction, *limit))
+                    moves.extend(self.get_walk_moves(me, pos, *direction, *limit, Capability::Both))
                 }
                 MovementPattern::Step(steps) => moves.extend(self.get_step_moves(me, pos, *steps)),
                 MovementPattern::Pawn => moves.extend(self.get_pawn_moves(me, pos)),
@@ -126,7 +127,7 @@ impl Board {
         };
 
         if starting_positions.contains(&pos) {
-            options.extend(self.get_walk_moves(me, pos, direction, Some(2)));
+            options.extend(self.get_walk_moves(me, pos, direction, Some(2), Capability::Move));
         }
 
         // --- capture diagonally
@@ -166,11 +167,11 @@ impl Board {
         mut pos: Position,
         (dy, dx): (isize, isize),
         nr_steps: Option<usize>,
+        capability: Capability,
     ) -> Vec<MoveOption> {
         let mut options = Vec::new();
         for _ in 0..nr_steps.unwrap_or(BOARD_DIM) {
-            let Some(new_move) = self.is_movement_option(&pos, me.side, dy, dx, Capability::Both)
-            else {
+            let Some(new_move) = self.is_movement_option(&pos, me.side, dy, dx, capability) else {
                 return options;
             };
             options.push(new_move);
