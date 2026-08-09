@@ -3,10 +3,11 @@
 use std::error::Error;
 
 use hexagon_logic::{
-    Game, Side,
+    Game, NextTurn, Side,
     board::{Board, Marker},
     coordinates::Position,
     display::{self, save_board_to_html_file, write_html},
+    new_game,
     piece::{Piece, PieceType, get_startup_pieces_black, get_startup_pieces_white},
 };
 
@@ -29,10 +30,14 @@ fn find_output_directory() -> PathBuf {
 
 fn main() -> Result<()> {
     ChessTerminal::clc()?;
-    let mut game = Game::new();
+    let mut game = new_game();
     let terminal = ChessTerminal;
 
-    game.make_move(('B', 5), ('B', 6))?;
+    let NextTurn::Continued(mut game) = game.make_move(('B', 5), ('B', 6)).map_err(|e| e.error)?
+    else {
+        panic!("??")
+    };
+
     game.mark_move_options(('B', 6));
 
     terminal.display(game.board())?;

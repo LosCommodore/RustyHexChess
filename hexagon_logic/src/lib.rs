@@ -1,5 +1,11 @@
+pub mod board;
+pub mod coordinates;
+pub mod display;
+mod movement;
+pub mod piece;
+
 use crate::{
-    board::{Action, Board, MoveOption},
+    board::{Action, Board, MoveError, MoveOption},
     coordinates::Position,
     piece::{
         BLACK_PAWNS_PROMOTION_POSITIONS, Piece, PieceType, WHITE_PAWNS_PROMOTION_POSITIONS,
@@ -7,32 +13,27 @@ use crate::{
     },
 };
 use strum::EnumIter;
-use thiserror::Error; // Cleaned up unified import
 
-#[derive(Debug, Error)]
-pub enum MoveError {
-    #[error("Given position {0} is outside of the board")]
-    OutsideBoard(Position),
-
-    #[error("no piece at source position")]
-    NoPieceAtPosition,
-
-    #[error("destination is not reachable")]
-    IllegalMove,
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum UserError {
+    #[error(transparent)]
+    MoveError(#[from] board::MoveError),
 
     #[error("piece belongs to the other player")]
     WrongPlayer,
-
-    #[error("invalid position")]
-    InvalidPosition,
 }
-type Result<T> = std::result::Result<T, MoveError>;
 
-pub mod board;
-pub mod coordinates;
-pub mod display;
-mod movement;
-pub mod piece;
+pub struct GameError<T> {
+    pub game: T,
+    pub error: UserError,
+}
+
+impl<G> GameError<G> {
+    fn new(game: G, error: UserError) -> Self {
+        Self { game, error }
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, EnumIter)]
 pub enum Side {
@@ -50,49 +51,77 @@ pub struct Move {
 
 #[allow(unused)]
 #[derive(Default)]
-pub struct Game {
+pub struct Game<T> {
     board: Board,
     active_side: Side,
     moves: Vec<Move>,
+    state: T,
 }
 
-impl Game {
-    pub fn new() -> Self {
-        let mut board = Board::default();
-        board.pieces.extend(get_startup_pieces_white());
-        board.pieces.extend(get_startup_pieces_black());
-        Game {
-            board,
-            ..Default::default()
-        }
-    }
+pub struct NormalTurn;
+pub struct GameOver;
+pub struct PromotePawn;
 
+pub enum NextTurn {
+    Continued(Game<NormalTurn>),
+    PromotionRequired(Game<PromotePawn>),
+    GameOver(Game<GameOver>),
+}
+
+pub type GameResult<Game> = std::result::Result<NextTurn, GameError<Game>>;
+pub type Result<T> = std::result::Result<T, UserError>;
+
+pub fn new_game() -> Game<NormalTurn> {
+    let mut board = Board::default();
+    board.pieces.extend(get_startup_pieces_white());
+    board.pieces.extend(get_startup_pieces_black());
+    Game {
+        board,
+        active_side: Side::White,
+        moves: Vec::new(),
+        state: NormalTurn,
+    }
+}
+
+impl Game<NormalTurn> {
     /// Make a move on the board. Move must be valid, otherwise an error will be returned
-    pub fn make_move<T, U>(&mut self, origin: T, destination: U) -> Result<Move>
+    pub fn make_move<T, U>(mut self, origin_pos: T, destination_pos: U) -> GameResult<Self>
     where
         T: TryInto<Position>,
         T::Error: std::fmt::Debug, // Accepts () or Infallible or any Debug type
         U: TryInto<Position>,
         U::Error: std::fmt::Debug,
     {
-        use MoveError::*;
-        let origin = origin.try_into().map_err(|_| InvalidPosition)?;
-        let destination = destination.try_into().map_err(|_| InvalidPosition)?;
+        let Ok(origin) = origin_pos.try_into() else {
+            return Err(GameError::new(self, MoveError::InvalidPosition.into()));
+        };
 
-        let &Piece {
+        let Ok(destination) = destination_pos.try_into() else {
+            return Err(GameError::new(self, MoveError::InvalidPosition.into()));
+        };
+
+        let Some(&Piece {
             side, piece_type, ..
-        } = self.board.pieces.get(&origin).ok_or(NoPieceAtPosition)?;
+        }) = self.board.pieces.get(&origin)
+        else {
+            let err = GameError::new(self, MoveError::NoPieceAtPosition.into());
+            return Err(err);
+        };
 
         if side != self.active_side {
-            return Err(WrongPlayer);
+            return Err(GameError::new(self, UserError::WrongPlayer));
         }
 
-        let options = self.board.get_movement_options(origin)?;
+        let options = match self.board.get_movement_options(origin) {
+            Ok(x) => x,
+            Err(err) => return Err(GameError::new(self, err.into())),
+        };
 
-        let valid_move = options
-            .iter()
-            .find(|option| option.pos == destination)
-            .ok_or(IllegalMove)?;
+        let Some(valid_move) = options.iter().find(|option| option.pos == destination) else {
+            return Err(GameError::new(self, MoveError::IllegalMove.into()));
+        };
+
+        //.ok_or(GameError::new(self, MoveError::IllegalMove.into()))?;
 
         let target_occupied = self.board.pieces.contains_key(&destination);
 
@@ -112,7 +141,7 @@ impl Game {
 
         self.board.pieces.insert(destination, piece);
 
-        let move_ = Move {
+        let _move = Move {
             origin,
             destination,
             action: valid_move.action,
@@ -131,15 +160,16 @@ impl Game {
         }
 
         self.next_turn();
-        Ok(move_)
+
+        Ok(NextTurn::Continued(self))
     }
 
     pub fn get_movement_options(&self, pos: Position) -> Result<Vec<MoveOption>> {
-        self.board.get_movement_options(pos)
+        self.board.get_movement_options(pos).map_err(|e| e.into())
         // todo -> add en passant
     }
 
-    pub fn next_turn(&mut self) {
+    fn next_turn(&mut self) {
         self.active_side = match self.active_side {
             Side::Black => Side::White,
             Side::White => Side::Black,

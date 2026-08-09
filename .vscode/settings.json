@@ -6,9 +6,12 @@
   "rust-analyzer.inlayHints.closureReturnTypeHints.enable": "never",
   "rust-analyzer.inlayHints.lifetimeElisionHints.enable": "never",
   "cSpell.words": [
+    "containerpub",
     "crossterm",
     "insta",
     "msvc",
+    "statesimpl",
+    "statespub",
     "thiserror"
   ],
 }

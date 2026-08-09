@@ -1,8 +1,10 @@
+use thiserror::Error;
+
 use super::piece::Piece;
 use std::collections::HashMap;
 
 use crate::{
-    MoveError, Result, Side,
+    Side,
     coordinates::{BOARD_DIM, Position},
     movement::{MovementPattern, get_movement_patterns},
     piece::{BLACK_PAWNS_STARTING_POSITIONS, WHITE_PAWNS_STARTING_POSITIONS},
@@ -10,6 +12,24 @@ use crate::{
 pub enum Marker {
     MovementOption,
 }
+
+#[non_exhaustive]
+#[derive(Debug, Error)]
+pub enum MoveError {
+    #[error("Given position {0} is outside of the board")]
+    OutsideBoard(Position),
+
+    #[error("no piece at source position")]
+    NoPieceAtPosition,
+
+    #[error("destination is not reachable")]
+    IllegalMove,
+
+    #[error("invalid position")]
+    InvalidPosition,
+}
+
+type Result<T> = std::result::Result<T, super::MoveError>;
 
 /// Possible Actions for a Piece
 /// Note:
