@@ -56,7 +56,7 @@ pub const BLACK_PAWNS_PROMOTION_POSITIONS: [Position; 11] = [
     Position { y: 10, x: 0 },
 ];
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Piece {
     pub piece_type: PieceType,
     pub side: Side,

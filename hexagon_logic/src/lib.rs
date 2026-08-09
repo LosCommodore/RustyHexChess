@@ -43,7 +43,6 @@ pub enum Side {
 
 #[allow(unused)]
 pub struct Move {
-    piece: Piece,
     origin: Position,
     destination: Position,
     action: Action,
@@ -80,46 +79,47 @@ impl Game {
         let origin = origin.try_into().map_err(|_| InvalidPosition)?;
         let destination = destination.try_into().map_err(|_| InvalidPosition)?;
 
-        let piece_clone = self
-            .board
-            .pieces
-            .get(&origin)
-            .ok_or(NoPieceAtPosition)?
-            .clone();
+        let &Piece {
+            side, piece_type, ..
+        } = self.board.pieces.get(&origin).ok_or(NoPieceAtPosition)?;
 
-        if piece_clone.side != self.active_side {
+        if side != self.active_side {
             return Err(WrongPlayer);
         }
 
         let options = self.board.get_movement_options(origin)?;
-
-        // todo: add en passant here -> extend movement options for pawn.
 
         let valid_move = options
             .iter()
             .find(|option| option.pos == destination)
             .ok_or(IllegalMove)?;
 
+        let target_occupied = self.board.pieces.contains_key(&destination);
+
         match valid_move.action {
             Action::Move => {
-                let piece = self.board.pieces.remove(&origin).expect("No piece ???");
-                assert!(self.board.pieces.insert(destination, piece).is_none());
+                assert!(!target_occupied, "Move action targeted an occupied square!")
             }
             Action::Capture => {
-                let piece = self.board.pieces.remove(&origin).expect("No piece ???");
-                assert!(self.board.pieces.insert(destination, piece).is_some());
+                assert!(target_occupied, "Capture action targeted an empty square!")
             }
-        };
+        }
+        let piece = self
+            .board
+            .pieces
+            .remove(&origin)
+            .expect("No piece at origin");
+
+        self.board.pieces.insert(destination, piece);
 
         let move_ = Move {
-            piece: piece_clone.clone(),
             origin,
             destination,
             action: valid_move.action,
         };
 
-        if piece_clone.piece_type == PieceType::Pawn {
-            let promotion_fields = match piece_clone.side {
+        if piece_type == PieceType::Pawn {
+            let promotion_fields = match side {
                 Side::Black => BLACK_PAWNS_PROMOTION_POSITIONS,
                 Side::White => WHITE_PAWNS_PROMOTION_POSITIONS,
             };

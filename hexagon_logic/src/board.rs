@@ -230,10 +230,10 @@ mod tests {
         insta::assert_debug_snapshot!(snapshot_name, options);
     }
 
-    fn move_piece(pos: HumanCoordinate, piece: &Piece, snapshot_name: &str) -> Board {
+    fn move_piece(pos: HumanCoordinate, piece: Piece, snapshot_name: &str) -> Board {
         let mut board = Board::default();
         let pos = Position::try_from(pos).expect("invalid position");
-        board.pieces.insert(pos, piece.clone());
+        board.pieces.insert(pos, piece);
         mark_and_snap(&mut board, &[pos], snapshot_name);
         board
     }
@@ -244,7 +244,7 @@ mod tests {
             piece_type: PieceType::Rook,
             side: Side::Black,
         };
-        move_piece(('F', 5), &piece, "test_move_rook");
+        move_piece(('F', 5), piece, "test_move_rook");
     }
 
     #[test]
@@ -253,7 +253,7 @@ mod tests {
             piece_type: PieceType::Queen,
             side: Side::Black,
         };
-        move_piece(('F', 5), &piece, "test_move_queen");
+        move_piece(('F', 5), piece, "test_move_queen");
     }
 
     #[test]
@@ -262,7 +262,7 @@ mod tests {
             piece_type: PieceType::King,
             side: Side::Black,
         };
-        move_piece(('F', 5), &piece, "test_move_king");
+        move_piece(('F', 5), piece, "test_move_king");
     }
 
     #[test]
@@ -271,7 +271,7 @@ mod tests {
             piece_type: PieceType::Bishop,
             side: Side::Black,
         };
-        move_piece(('F', 5), &piece, "test_move_bishop");
+        move_piece(('F', 5), piece, "test_move_bishop");
     }
 
     #[test]
@@ -280,7 +280,7 @@ mod tests {
             piece_type: PieceType::Knight,
             side: Side::Black,
         };
-        move_piece(('F', 5), &piece, "test_move_knight");
+        move_piece(('F', 5), piece, "test_move_knight");
     }
 
     #[test]
@@ -289,7 +289,7 @@ mod tests {
             piece_type: PieceType::Pawn,
             side: Side::Black,
         };
-        move_piece(('F', 5), &piece, "test_move_pawn_black");
+        move_piece(('F', 5), piece, "test_move_pawn_black");
     }
 
     #[test]
@@ -298,7 +298,7 @@ mod tests {
             piece_type: PieceType::Pawn,
             side: Side::White,
         };
-        move_piece(('F', 5), &piece, "test_move_pawn_white");
+        move_piece(('F', 5), piece, "test_move_pawn_white");
     }
 
     #[test]
