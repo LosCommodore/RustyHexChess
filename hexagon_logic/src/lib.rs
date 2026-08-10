@@ -60,7 +60,9 @@ pub struct Game<T> {
 
 pub struct NormalTurn;
 pub struct GameOver;
-pub struct PromotePawn;
+pub struct PromotePawn {
+    promote_pos: Position,
+}
 
 pub enum NextTurn {
     Continued(Game<NormalTurn>),
@@ -80,6 +82,21 @@ pub fn new_game() -> Game<NormalTurn> {
         active_side: Side::White,
         moves: Vec::new(),
         state: NormalTurn,
+    }
+}
+
+impl<T> Game<T> {
+    pub fn transition<N>(self, new_state: N) -> Game<N> {
+        Game {
+            board: self.board,
+            active_side: self.active_side,
+            moves: self.moves,
+            state: new_state,
+        }
+    }
+
+    pub fn board(&self) -> &Board {
+        &self.board
     }
 }
 
@@ -121,8 +138,6 @@ impl Game<NormalTurn> {
             return Err(GameError::new(self, MoveError::IllegalMove.into()));
         };
 
-        //.ok_or(GameError::new(self, MoveError::IllegalMove.into()))?;
-
         let target_occupied = self.board.pieces.contains_key(&destination);
 
         match valid_move.action {
@@ -141,12 +156,6 @@ impl Game<NormalTurn> {
 
         self.board.pieces.insert(destination, piece);
 
-        let _move = Move {
-            origin,
-            destination,
-            action: valid_move.action,
-        };
-
         if piece_type == PieceType::Pawn {
             let promotion_fields = match side {
                 Side::Black => BLACK_PAWNS_PROMOTION_POSITIONS,
@@ -155,12 +164,19 @@ impl Game<NormalTurn> {
 
             let is_promotion = promotion_fields.iter().any(|x| *x == destination);
             if is_promotion {
-                println!("You are promoted !")
+                return Ok(NextTurn::PromotionRequired(self.transition(PromotePawn {
+                    promote_pos: destination,
+                })));
             }
         }
 
-        self.next_turn();
+        self.moves.push(Move {
+            origin,
+            destination,
+            action: valid_move.action,
+        });
 
+        self.next_turn();
         Ok(NextTurn::Continued(self))
     }
 
@@ -176,10 +192,6 @@ impl Game<NormalTurn> {
         };
     }
 
-    pub fn board(&self) -> &Board {
-        &self.board
-    }
-
     pub fn mark_move_options<T>(&mut self, pos: T) -> Result<()>
     where
         T: TryInto<Position>,
@@ -189,5 +201,14 @@ impl Game<NormalTurn> {
         let move_options = self.get_movement_options(pos)?;
         self.board.mark_move_options(&move_options);
         Ok(())
+    }
+}
+
+impl Game<PromotePawn> {
+    pub fn promote(self, _piece_type: PieceType) -> GameResult<Self> {
+        let _pos = self.state.promote_pos;
+        println!("you are promoted !");
+
+        Ok(NextTurn::Continued(self.transition(NormalTurn)))
     }
 }
