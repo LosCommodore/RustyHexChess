@@ -30,7 +30,7 @@ fn find_output_directory() -> PathBuf {
 
 fn main() -> Result<()> {
     ChessTerminal::clc()?;
-    let mut game = new_game();
+    let mut game = new_game(None);
     let terminal = ChessTerminal;
 
     let NextTurn::Continued(mut game) = game.make_move(('B', 5), ('B', 6)).map_err(|e| e.error)?

@@ -9,6 +9,8 @@ use crate::{
     movement::{MovementPattern, get_movement_patterns},
     piece::{BLACK_PAWNS_STARTING_POSITIONS, WHITE_PAWNS_STARTING_POSITIONS},
 };
+
+#[derive(Debug)]
 pub enum Marker {
     MovementOption,
 }
@@ -52,7 +54,7 @@ pub struct MoveOption {
     pub action: Action,
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct Board {
     pub pieces: HashMap<Position, Piece>,
     pub markers: HashMap<Position, Marker>,

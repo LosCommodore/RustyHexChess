@@ -24,6 +24,7 @@ pub enum UserError {
     WrongPlayer,
 }
 
+#[derive(Debug)]
 pub struct GameError<T> {
     pub game: T,
     pub error: UserError,
@@ -43,14 +44,14 @@ pub enum Side {
 }
 
 #[allow(unused)]
+#[derive(Debug)]
 pub struct Move {
     origin: Position,
     destination: Position,
     action: Action,
 }
 
-#[allow(unused)]
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct Game<T> {
     board: Board,
     active_side: Side,
@@ -58,13 +59,19 @@ pub struct Game<T> {
     state: T,
 }
 
+#[derive(Debug)]
 pub struct NormalTurn;
+
+#[derive(Debug)]
 pub struct GameOver;
+
+#[derive(Debug)]
 pub struct PromotePawn {
     origin: Position,
     destination: Position,
 }
 
+#[derive(Debug)]
 pub enum NextTurn {
     Continued(Game<NormalTurn>),
     PromotionRequired(Game<PromotePawn>),
@@ -74,10 +81,14 @@ pub enum NextTurn {
 pub type GameResult<Game> = std::result::Result<NextTurn, GameError<Game>>;
 pub type Result<T> = std::result::Result<T, UserError>;
 
-pub fn new_game() -> Game<NormalTurn> {
-    let mut board = Board::default();
-    board.pieces.extend(get_startup_pieces_white());
-    board.pieces.extend(get_startup_pieces_black());
+pub fn new_game(board: Option<Board>) -> Game<NormalTurn> {
+    let board = board.unwrap_or_else(|| {
+        let mut board = Board::default();
+        board.pieces.extend(get_startup_pieces_white());
+        board.pieces.extend(get_startup_pieces_black());
+        board
+    });
+
     Game {
         board,
         active_side: Side::White,
@@ -228,5 +239,57 @@ impl Game<PromotePawn> {
         self.board.pieces.insert(self.state.destination, new_piece);
 
         Ok(NextTurn::Continued(self.transition(NormalTurn)))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use core::panic;
+
+    use super::*;
+
+    #[test]
+    fn test_promote_pawn() {
+        // -- Create game with pawn
+        let mut board = Board::default();
+        let origin: Position = ('K', 5).try_into().unwrap();
+        let destination: Position = ('K', 6).try_into().unwrap();
+
+        board.pieces.insert(
+            origin,
+            Piece {
+                piece_type: PieceType::Pawn,
+                side: Side::White,
+            },
+        );
+        let game = new_game(Some(board));
+
+        // -- Move pawn
+        let game_result = game.make_move(origin, destination);
+
+        // -- Promote
+        let game = match game_result.expect("Error while playing move") {
+            NextTurn::PromotionRequired(game) => game,
+            _ => panic!("Wrong game state"),
+        };
+
+        // -- Check normal game state again
+        let NextTurn::Continued(game) = game
+            .promote(PieceType::Queen)
+            .expect("Error while promoting")
+        else {
+            panic!("Should be again normal game")
+        };
+
+        // -- Check Queen exists
+        assert!(
+            game.board()
+                .pieces
+                .get(&destination)
+                .expect("no piece ??")
+                .piece_type
+                == PieceType::Queen
+        );
+        println!("{game:#?}");
     }
 }
