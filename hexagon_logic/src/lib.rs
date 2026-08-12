@@ -4,6 +4,8 @@ pub mod display;
 mod movement;
 pub mod piece;
 
+use std::{collections::HashMap, ops::Not};
+
 use crate::{
     board::{Action, Board, MoveError, MoveOption},
     coordinates::Position,
@@ -222,6 +224,34 @@ impl Game<NormalTurn> {
         self.board.mark_move_options(&move_options);
         Ok(())
     }
+
+    pub fn king_in_check(&self) -> Result<bool> {
+        let enemy = !self.active_side;
+        let enemy_pieces = self.pieces_by_side(enemy);
+
+        let Some((&pos_king, _)) = self.board.pieces.iter().find(|(_, piece)| {
+            piece.side == self.active_side && piece.piece_type == PieceType::King
+        }) else {
+            panic!("King is missing on board")
+        };
+
+        let is_check: bool = enemy_pieces.iter().any(|(&pos, _)| {
+            self.get_movement_options(pos)
+                .map(|options| options.iter().any(|x| x.pos == pos_king))
+                .unwrap_or(false)
+        });
+
+        Ok(is_check)
+    }
+
+    pub fn pieces_by_side(&self, side: Side) -> HashMap<Position, &Piece> {
+        self.board
+            .pieces
+            .iter()
+            .filter(|(_, piece)| piece.side == side)
+            .map(|(&pos, piece)| (pos, piece))
+            .collect()
+    }
 }
 
 impl Game<PromotePawn> {
@@ -242,11 +272,22 @@ impl Game<PromotePawn> {
     }
 }
 
+impl Not for Side {
+    type Output = Self;
+
+    fn not(self) -> Self::Output {
+        match self {
+            Side::White => Side::Black,
+            Side::Black => Side::White,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use core::panic;
-
     use super::*;
+    use anyhow::Result;
+    use core::panic;
 
     #[test]
     fn test_promote_pawn() {
@@ -291,5 +332,46 @@ mod tests {
                 == PieceType::Queen
         );
         println!("{game:#?}");
+    }
+
+    #[test]
+    fn test_check() -> Result<()> {
+        let mut board = Board::default();
+        board.pieces.insert(
+            ('F', 5).try_into().unwrap(),
+            Piece {
+                piece_type: PieceType::King,
+                side: Side::White,
+            },
+        );
+
+        let mut game = new_game(Some(board));
+
+        let is_check = game.king_in_check()?;
+        assert!(!is_check, "expected no check here 1");
+
+        game.board.pieces.insert(
+            ('K', 5).try_into().unwrap(),
+            Piece {
+                piece_type: PieceType::Bishop,
+                side: Side::White,
+            },
+        );
+
+        let is_check = game.king_in_check()?;
+        assert!(!is_check, "expected no check here 2");
+
+        game.board.pieces.insert(
+            ('F', 1).try_into().unwrap(),
+            Piece {
+                piece_type: PieceType::Rook,
+                side: Side::Black,
+            },
+        );
+
+        let is_check = game.king_in_check()?;
+        assert!(is_check, "expected check due to rook here");
+
+        Ok(())
     }
 }
