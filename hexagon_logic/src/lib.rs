@@ -112,6 +112,10 @@ impl<T> Game<T> {
     pub fn board(&self) -> &Board {
         &self.board
     }
+
+    fn next_turn(&mut self) {
+        self.active_side = !self.active_side;
+    }
 }
 
 impl Game<NormalTurn> {
@@ -161,7 +165,11 @@ impl Game<NormalTurn> {
             Action::Capture => {
                 assert!(target_occupied, "Capture action targeted an empty square!")
             }
+            Action::Promote { .. } => panic!("Promotion not possible here"),
         }
+
+        // -- Normal move logic
+        self.move_piece(origin, destination, valid_move.action);
 
         // -- Promotion logic
         if piece_type == PieceType::Pawn {
@@ -179,8 +187,7 @@ impl Game<NormalTurn> {
             }
         }
 
-        // -- Normal move logic
-        self.move_piece(origin, destination, valid_move.action);
+        // -- Next turn
         self.next_turn();
         Ok(NextTurn::Continued(self))
     }
@@ -205,13 +212,6 @@ impl Game<NormalTurn> {
     pub fn get_movement_options(&self, pos: Position) -> Result<Vec<MoveOption>> {
         self.board.get_movement_options(pos).map_err(|e| e.into())
         // todo -> add en passant
-    }
-
-    fn next_turn(&mut self) {
-        self.active_side = match self.active_side {
-            Side::Black => Side::White,
-            Side::White => Side::Black,
-        };
     }
 
     pub fn mark_move_options<T>(&mut self, pos: T) -> Result<()>
@@ -267,6 +267,12 @@ impl Game<PromotePawn> {
         };
 
         self.board.pieces.insert(self.state.destination, new_piece);
+        self.moves.push(Move {
+            origin: self.state.origin,
+            destination: self.state.destination,
+            action: Action::Promote { to: piece_type },
+        });
+        self.next_turn();
 
         Ok(NextTurn::Continued(self.transition(NormalTurn)))
     }

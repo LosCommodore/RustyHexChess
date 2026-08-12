@@ -7,7 +7,7 @@ use crate::{
     Side,
     coordinates::{BOARD_DIM, Position},
     movement::{MovementPattern, get_movement_patterns},
-    piece::{BLACK_PAWNS_STARTING_POSITIONS, WHITE_PAWNS_STARTING_POSITIONS},
+    piece::{BLACK_PAWNS_STARTING_POSITIONS, PieceType, WHITE_PAWNS_STARTING_POSITIONS},
 };
 
 #[derive(Debug)]
@@ -46,6 +46,7 @@ type Result<T> = std::result::Result<T, super::MoveError>;
 pub enum Action {
     Move,
     Capture,
+    Promote { to: PieceType },
 }
 
 #[derive(Clone, Copy, Debug)]
