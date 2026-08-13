@@ -10,6 +10,7 @@
     "crossterm",
     "insta",
     "msvc",
+    "statemachine",
     "statesimpl",
     "statespub",
     "thiserror"

@@ -1,6 +1,6 @@
 ---
 source: hexagon_logic/src/board.rs
-assertion_line: 230
+assertion_line: 261
 expression: options
 ---
 [
@@ -30,13 +30,17 @@ expression: options
             y: 6,
             x: 4,
         },
-        action: Capture,
+        action: Capture {
+            piece_type: Bishop,
+        },
     },
     MoveOption {
         pos: Position {
             y: 4,
             x: 5,
         },
-        action: Capture,
+        action: Capture {
+            piece_type: Queen,
+        },
     },
 ]

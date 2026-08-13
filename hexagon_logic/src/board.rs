@@ -45,7 +45,7 @@ type Result<T> = std::result::Result<T, super::MoveError>;
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Action {
     Move,
-    Capture,
+    Capture { piece_type: PieceType },
     Promote { to: PieceType },
 }
 
@@ -117,7 +117,9 @@ impl Board {
                     _ => {
                         return Some(MoveOption {
                             pos,
-                            action: Action::Capture,
+                            action: Action::Capture {
+                                piece_type: piece.piece_type,
+                            },
                         });
                     }
                 }
@@ -198,7 +200,7 @@ impl Board {
                 return options;
             };
             options.push(new_move);
-            if new_move.action == Action::Capture {
+            if let Action::Capture { .. } = new_move.action {
                 break;
             }
 
@@ -213,6 +215,12 @@ impl Board {
         for MoveOption { pos, action: _ } in options {
             self.markers.insert(*pos, Marker::MovementOption);
         }
+    }
+
+    // Moves a piece and removes anything at the destination from the board
+    pub fn move_piece(&mut self, origin: Position, destination: Position) {
+        let piece = self.pieces.remove(&origin).expect("No piece at origin");
+        self.pieces.insert(destination, piece);
     }
 }
 

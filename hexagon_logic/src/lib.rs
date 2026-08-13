@@ -24,6 +24,9 @@ pub enum UserError {
 
     #[error("piece belongs to the other player")]
     WrongPlayer,
+
+    #[error("There is no move to undo")]
+    CannotUndo,
 }
 
 #[derive(Debug)]
@@ -58,7 +61,7 @@ pub struct Game<T> {
     board: Board,
     active_side: Side,
     moves: Vec<Move>,
-    state: T,
+    _state: T,
 }
 
 #[derive(Debug)]
@@ -68,10 +71,7 @@ pub struct NormalTurn;
 pub struct GameOver;
 
 #[derive(Debug)]
-pub struct PromotePawn {
-    origin: Position,
-    destination: Position,
-}
+pub struct PromotePawn;
 
 #[derive(Debug)]
 pub enum NextTurn {
@@ -95,7 +95,7 @@ pub fn new_game(board: Option<Board>) -> Game<NormalTurn> {
         board,
         active_side: Side::White,
         moves: Vec::new(),
-        state: NormalTurn,
+        _state: NormalTurn,
     }
 }
 
@@ -105,7 +105,7 @@ impl<T> Game<T> {
             board: self.board,
             active_side: self.active_side,
             moves: self.moves,
-            state: new_state,
+            _state: new_state,
         }
     }
 
@@ -115,6 +115,62 @@ impl<T> Game<T> {
 
     fn next_turn(&mut self) {
         self.active_side = !self.active_side;
+    }
+
+    /// Undo the last game move
+    pub fn undo(mut self) -> GameResult<Self> {
+        let mv = self.undo_move();
+        match mv {
+            None => {
+                return Err(GameError {
+                    game: self,
+                    error: UserError::CannotUndo,
+                });
+            }
+            Some(Move {
+                action: Action::Capture { .. } | Action::Move,
+                ..
+            }) => return Ok(NextTurn::Continued(self.transition(NormalTurn))),
+            Some(Move {
+                action: Action::Promote { .. },
+                ..
+            }) => {
+                return Ok(NextTurn::PromotionRequired(self.transition(PromotePawn)));
+            }
+        }
+    }
+
+    // Helper function: undo the move but not the statemachine of the game
+    fn undo_move(&mut self) -> Option<Move> {
+        let move_ = self.moves.pop()?;
+
+        let Move {
+            origin,
+            destination,
+            action,
+        } = move_;
+
+        match action {
+            Action::Move => {
+                self.board.move_piece(destination, origin);
+            }
+            Action::Capture { piece_type } => {
+                self.board.move_piece(destination, origin);
+                self.board.pieces.insert(
+                    destination,
+                    Piece {
+                        piece_type,
+                        side: !self.active_side,
+                    },
+                );
+            }
+            Action::Promote { .. } => {
+                todo!()
+            }
+        }
+
+        self.active_side = !self.active_side;
+        Some(move_)
     }
 }
 
@@ -162,14 +218,20 @@ impl Game<NormalTurn> {
             Action::Move => {
                 assert!(!target_occupied, "Move action targeted an occupied square!")
             }
-            Action::Capture => {
+            Action::Capture { .. } => {
                 assert!(target_occupied, "Capture action targeted an empty square!")
             }
             Action::Promote { .. } => panic!("Promotion not possible here"),
         }
 
         // -- Normal move logic
-        self.move_piece(origin, destination, valid_move.action);
+        self.board.move_piece(origin, destination);
+
+        self.moves.push(Move {
+            origin,
+            destination,
+            action: valid_move.action,
+        });
 
         // -- Promotion logic
         if piece_type == PieceType::Pawn {
@@ -180,33 +242,13 @@ impl Game<NormalTurn> {
 
             let is_promotion = promotion_fields.iter().any(|x| *x == destination);
             if is_promotion {
-                return Ok(NextTurn::PromotionRequired(self.transition(PromotePawn {
-                    origin,
-                    destination,
-                })));
+                return Ok(NextTurn::PromotionRequired(self.transition(PromotePawn)));
             }
         }
 
         // -- Next turn
         self.next_turn();
         Ok(NextTurn::Continued(self))
-    }
-
-    // Moves a piece and removes anything at the destination from the board
-    fn move_piece(&mut self, origin: Position, destination: Position, action: Action) {
-        let piece = self
-            .board
-            .pieces
-            .remove(&origin)
-            .expect("No piece at origin");
-
-        self.board.pieces.insert(destination, piece);
-
-        self.moves.push(Move {
-            origin,
-            destination,
-            action,
-        });
     }
 
     pub fn get_movement_options(&self, pos: Position) -> Result<Vec<MoveOption>> {
@@ -256,20 +298,21 @@ impl Game<NormalTurn> {
 
 impl Game<PromotePawn> {
     pub fn promote(mut self, piece_type: PieceType) -> GameResult<Self> {
-        self.board
-            .pieces
-            .remove(&self.state.origin)
-            .expect("No piece at origin");
+        let destination = self
+            .moves
+            .last()
+            .expect("promotion without history?")
+            .destination;
 
         let new_piece = Piece {
             piece_type,
             side: self.active_side,
         };
 
-        self.board.pieces.insert(self.state.destination, new_piece);
+        self.board.pieces.insert(destination, new_piece);
         self.moves.push(Move {
-            origin: self.state.origin,
-            destination: self.state.destination,
+            origin: destination,
+            destination: destination,
             action: Action::Promote { to: piece_type },
         });
         self.next_turn();
