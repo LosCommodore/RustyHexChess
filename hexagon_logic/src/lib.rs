@@ -149,7 +149,7 @@ impl<T> Game<T> {
         let move_ = self.moves.pop()?;
 
         let Move {
-            origin,undo
+            origin,
             destination,
             action,
         } = move_;
