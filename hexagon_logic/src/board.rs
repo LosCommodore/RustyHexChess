@@ -1,3 +1,6 @@
+use serde::Serialize;
+use serde_with::Same;
+use serde_with::serde_as;
 use thiserror::Error;
 
 use super::piece::Piece;
@@ -10,7 +13,7 @@ use crate::{
     piece::{BLACK_PAWNS_STARTING_POSITIONS, PieceType, WHITE_PAWNS_STARTING_POSITIONS},
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize)]
 pub enum Marker {
     MovementOption,
 }
@@ -42,7 +45,7 @@ type Result<T> = std::result::Result<T, super::MoveError>;
 ///      then it is also allowed to move two vacant cells vertically forward.
 ///   2. It may capture one cell orthogonally forward at a 60° angle to the vertical, including capturing en passant.
 ///   3. It is promoted when it reaches the end of any file.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 pub enum Action {
     Move,
     Capture { piece_type: PieceType },
@@ -55,9 +58,13 @@ pub struct MoveOption {
     pub action: Action,
 }
 
-#[derive(Default, Debug)]
+#[serde_as]
+#[derive(Default, Debug, Clone, Eq, PartialEq, Serialize)]
 pub struct Board {
+    #[serde_as(as = "Vec<(Same, Same)>")]
     pub pieces: HashMap<Position, Piece>,
+
+    #[serde_as(as = "Vec<(Same, Same)>")]
     pub markers: HashMap<Position, Marker>,
 }
 

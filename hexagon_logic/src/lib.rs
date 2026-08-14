@@ -14,6 +14,7 @@ use crate::{
         get_startup_pieces_black, get_startup_pieces_white,
     },
 };
+use serde::Serialize;
 use strum::EnumIter;
 
 #[derive(Debug, thiserror::Error)]
@@ -41,7 +42,7 @@ impl<G> GameError<G> {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, EnumIter)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, EnumIter, Serialize)]
 pub enum Side {
     #[default]
     White,
@@ -49,14 +50,14 @@ pub enum Side {
 }
 
 #[allow(unused)]
-#[derive(Debug)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Move {
     origin: Position,
     destination: Position,
     action: Action,
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone, Serialize)]
 pub struct Game<T> {
     board: Board,
     active_side: Side,
@@ -64,13 +65,13 @@ pub struct Game<T> {
     _state: T,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct NormalTurn;
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct GameOver;
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct PromotePawn;
 
 #[derive(Debug)]
@@ -130,7 +131,10 @@ impl<T> Game<T> {
             Some(Move {
                 action: Action::Capture { .. } | Action::Move,
                 ..
-            }) => return Ok(NextTurn::Continued(self.transition(NormalTurn))),
+            }) => {
+                self.active_side = !self.active_side;
+                return Ok(NextTurn::Continued(self.transition(NormalTurn)));
+            }
             Some(Move {
                 action: Action::Promote { .. },
                 ..
@@ -145,7 +149,7 @@ impl<T> Game<T> {
         let move_ = self.moves.pop()?;
 
         let Move {
-            origin,
+            origin,undo
             destination,
             action,
         } = move_;
@@ -335,7 +339,7 @@ impl Not for Side {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use anyhow::Result;
+    use anyhow::{Result, bail};
     use core::panic;
 
     #[test]
@@ -384,6 +388,13 @@ mod tests {
     }
 
     #[test]
+    fn test_serde_json() -> Result<()> {
+        let game = new_game(None);
+        serde_json::to_string(&game)?;
+        Ok(())
+    }
+
+    #[test]
     fn test_check() -> Result<()> {
         let mut board = Board::default();
         board.pieces.insert(
@@ -421,6 +432,85 @@ mod tests {
         let is_check = game.king_in_check()?;
         assert!(is_check, "expected check due to rook here");
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_undo() -> Result<()> {
+        let mut board = Board::default();
+        board.pieces.insert(
+            ('F', 5).try_into().unwrap(),
+            Piece {
+                piece_type: PieceType::King,
+                side: Side::White,
+            },
+        );
+
+        board.pieces.insert(
+            ('I', 2).try_into().unwrap(),
+            Piece {
+                piece_type: PieceType::King,
+                side: Side::Black,
+            },
+        );
+
+        let origin = ('F', 9).try_into().unwrap();
+        board.pieces.insert(
+            origin,
+            Piece {
+                piece_type: PieceType::Pawn,
+                side: Side::White,
+            },
+        );
+
+        board.pieces.insert(
+            ('G', 9).try_into().unwrap(),
+            Piece {
+                piece_type: PieceType::Bishop,
+                side: Side::Black,
+            },
+        );
+
+        // White pawn takes Bishop
+        let game = new_game(Some(board));
+        let mut game_states = Vec::new();
+        game_states.push(serde_json::to_string(&game)?);
+
+        let NextTurn::Continued(game) = game.make_move(origin, ('G', 9)).map_err(|e| e.error)?
+        else {
+            bail!("wrong game state 1")
+        };
+        game_states.push(serde_json::to_string(&game)?);
+
+        // Black King moves
+        let NextTurn::Continued(game) = game.make_move(('I', 2), ('I', 3)).map_err(|e| e.error)?
+        else {
+            bail!("Wrong game state 2")
+        };
+        let last_state = serde_json::to_string(&game)?;
+
+        // White Pawn moves
+        let NextTurn::PromotionRequired(game) =
+            game.make_move(('G', 9), ('G', 10)).map_err(|e| e.error)?
+        else {
+            bail!("Wrong game state 3")
+        };
+
+        let NextTurn::Continued(mut game) = game.undo().map_err(|e| e.error)? else {
+            bail!("wrong state while undoing")
+        };
+        let new_state = serde_json::to_string(&game)?;
+        assert!(new_state == last_state, "game state not identical");
+
+        for game_state in game_states.into_iter().rev() {
+            println!("undoing move {:?}", game.moves.last());
+            let NextTurn::Continued(next_game) = game.undo().map_err(|e| e.error)? else {
+                bail!("wrong state while undoing")
+            };
+            game = next_game;
+            let new_state = serde_json::to_string(&game)?;
+            assert!(new_state == game_state, "game state not identical");
+        }
         Ok(())
     }
 }

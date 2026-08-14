@@ -3,6 +3,7 @@ use std::collections::HashMap;
 
 use super::coordinates::*;
 use anyhow::{Ok, Result};
+use serde::Serialize;
 
 pub const WHITE_PAWNS_STARTING_POSITIONS: [Position; 9] = [
     Position { y: 1, x: 4 }, // ('B', 5))
@@ -56,13 +57,13 @@ pub const BLACK_PAWNS_PROMOTION_POSITIONS: [Position; 11] = [
     Position { y: 10, x: 0 },
 ];
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize)]
 pub struct Piece {
     pub piece_type: PieceType,
     pub side: Side,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub enum PieceType {
     King,
     Queen,

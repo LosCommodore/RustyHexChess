@@ -1,5 +1,7 @@
 use std::fmt::{self};
 
+use serde::Serialize;
+
 /// Internal range for 2nd Dimension, zero-indexed, open interval
 
 pub const BOARD_DIM: usize = 11;
@@ -20,7 +22,7 @@ pub const X_RANGE: [(usize, usize); BOARD_DIM] = [
 pub type HumanCoordinate = (char, usize); // (a..k | A..K , 1..11)
 
 /// Internal positions, 0-indexed | both coordinates are numbers.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
 pub struct Position {
     pub y: usize, // letters
     pub x: usize,
