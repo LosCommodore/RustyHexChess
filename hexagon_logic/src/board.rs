@@ -4,7 +4,7 @@ use serde_with::serde_as;
 use thiserror::Error;
 
 use super::piece::Piece;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use crate::{
     Side,
@@ -62,10 +62,10 @@ pub struct MoveOption {
 #[derive(Default, Debug, Clone, Eq, PartialEq, Serialize)]
 pub struct Board {
     #[serde_as(as = "Vec<(Same, Same)>")]
-    pub pieces: HashMap<Position, Piece>,
+    pub pieces: BTreeMap<Position, Piece>,
 
     #[serde_as(as = "Vec<(Same, Same)>")]
-    pub markers: HashMap<Position, Marker>,
+    pub markers: BTreeMap<Position, Marker>,
 }
 
 #[derive(Clone, Copy, Debug)]

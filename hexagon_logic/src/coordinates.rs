@@ -22,7 +22,7 @@ pub const X_RANGE: [(usize, usize); BOARD_DIM] = [
 pub type HumanCoordinate = (char, usize); // (a..k | A..K , 1..11)
 
 /// Internal positions, 0-indexed | both coordinates are numbers.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Ord, PartialOrd)]
 pub struct Position {
     pub y: usize, // letters
     pub x: usize,
