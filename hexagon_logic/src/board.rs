@@ -10,7 +10,7 @@ use crate::{
     Side,
     coordinates::{BOARD_DIM, Position},
     movement::{MovementPattern, get_movement_patterns},
-    piece::{BLACK_PAWNS_STARTING_POSITIONS, PieceType, WHITE_PAWNS_STARTING_POSITIONS},
+    piece::{BLACK_PAWNS_STARTING_POSITIONS, WHITE_PAWNS_STARTING_POSITIONS},
 };
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize)]
@@ -45,14 +45,14 @@ type Result<T> = std::result::Result<T, super::MoveError>;
 ///      then it is also allowed to move two vacant cells vertically forward.
 ///   2. It may capture one cell orthogonally forward at a 60° angle to the vertical, including capturing en passant.
 ///   3. It is promoted when it reaches the end of any file.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub enum Action {
     Move,
-    Capture { piece_type: PieceType },
-    Promote { to: PieceType },
+    Capture { piece: Piece },
+    Promote { to: Piece },
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct MoveOption {
     pub pos: Position,
     pub action: Action,
@@ -125,7 +125,7 @@ impl Board {
                         return Some(MoveOption {
                             pos,
                             action: Action::Capture {
-                                piece_type: piece.piece_type,
+                                piece: piece.clone(),
                             },
                         });
                     }
@@ -206,7 +206,7 @@ impl Board {
             let Some(new_move) = self.is_movement_option(&pos, me.side, dy, dx, capability) else {
                 return options;
             };
-            options.push(new_move);
+            options.push(new_move.clone());
             if let Action::Capture { .. } = new_move.action {
                 break;
             }

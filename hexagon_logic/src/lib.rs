@@ -118,36 +118,10 @@ impl<T> Game<T> {
         self.active_side = !self.active_side;
     }
 
-    /// Undo the last game move
-    pub fn undo(mut self) -> GameResult<Self> {
-        let mv = self.undo_move();
-        match mv {
-            None => {
-                return Err(GameError {
-                    game: self,
-                    error: UserError::CannotUndo,
-                });
-            }
-            Some(Move {
-                action: Action::Capture { .. } | Action::Move,
-                ..
-            }) => {
-                self.active_side = !self.active_side;
-                return Ok(NextTurn::Continued(self.transition(NormalTurn)));
-            }
-            Some(Move {
-                action: Action::Promote { .. },
-                ..
-            }) => {
-                return Ok(NextTurn::PromotionRequired(self.transition(PromotePawn)));
-            }
-        }
-    }
-
     // Helper function: undo the move but not the statemachine of the game
     fn undo_move(&mut self) -> Option<Move> {
         let move_ = self.moves.pop()?;
-
+        let move_clone = move_.clone();
         let Move {
             origin,
             destination,
@@ -158,23 +132,26 @@ impl<T> Game<T> {
             Action::Move => {
                 self.board.move_piece(destination, origin);
             }
-            Action::Capture { piece_type } => {
+            Action::Capture { piece } => {
                 self.board.move_piece(destination, origin);
+                self.board.pieces.insert(destination, piece);
+            }
+            Action::Promote { .. } => {
+                let Move { destination, .. } = self
+                    .moves
+                    .last()
+                    .expect("Promotion without previous move ???");
+
                 self.board.pieces.insert(
-                    destination,
+                    *destination,
                     Piece {
-                        piece_type,
-                        side: !self.active_side,
+                        piece_type: PieceType::Pawn,
+                        side: self.active_side,
                     },
                 );
             }
-            Action::Promote { .. } => {
-                todo!()
-            }
         }
-
-        self.active_side = !self.active_side;
-        Some(move_)
+        Some(move_clone)
     }
 }
 
@@ -234,7 +211,7 @@ impl Game<NormalTurn> {
         self.moves.push(Move {
             origin,
             destination,
-            action: valid_move.action,
+            action: valid_move.action.clone(),
         });
 
         // -- Promotion logic
@@ -298,6 +275,33 @@ impl Game<NormalTurn> {
             .map(|(&pos, piece)| (pos, piece))
             .collect()
     }
+
+    // Undo the last game move
+    pub fn undo(mut self) -> GameResult<Self> {
+        let mv = self.undo_move();
+        match mv {
+            None => {
+                return Err(GameError {
+                    game: self,
+                    error: UserError::CannotUndo,
+                });
+            }
+            Some(Move {
+                action: Action::Capture { .. } | Action::Move,
+                ..
+            }) => {
+                self.active_side = !self.active_side;
+                return Ok(NextTurn::Continued(self.transition(NormalTurn)));
+            }
+            Some(Move {
+                action: Action::Promote { .. },
+                ..
+            }) => {
+                self.active_side = !self.active_side;
+                return Ok(NextTurn::PromotionRequired(self.transition(PromotePawn)));
+            }
+        }
+    }
 }
 
 impl Game<PromotePawn> {
@@ -313,15 +317,39 @@ impl Game<PromotePawn> {
             side: self.active_side,
         };
 
-        self.board.pieces.insert(destination, new_piece);
+        self.board.pieces.insert(destination, new_piece.clone());
         self.moves.push(Move {
             origin: destination,
             destination: destination,
-            action: Action::Promote { to: piece_type },
+            action: Action::Promote { to: new_piece },
         });
         self.next_turn();
 
         Ok(NextTurn::Continued(self.transition(NormalTurn)))
+    }
+
+    pub fn undo(mut self) -> GameResult<Self> {
+        let mv = self.undo_move();
+        match mv {
+            None => {
+                return Err(GameError {
+                    game: self,
+                    error: UserError::CannotUndo,
+                });
+            }
+            Some(Move {
+                action: Action::Capture { .. } | Action::Move,
+                ..
+            }) => {
+                return Ok(NextTurn::Continued(self.transition(NormalTurn)));
+            }
+            Some(Move {
+                action: Action::Promote { .. },
+                ..
+            }) => {
+                return Ok(NextTurn::PromotionRequired(self.transition(PromotePawn)));
+            }
+        }
     }
 }
 
@@ -496,11 +524,12 @@ mod tests {
             bail!("Wrong game state 3")
         };
 
+        println!("undoing move {:?}", game.moves.last());
         let NextTurn::Continued(mut game) = game.undo().map_err(|e| e.error)? else {
             bail!("wrong state while undoing")
         };
         let new_state = serde_json::to_string(&game)?;
-        assert!(new_state == last_state, "game state not identical");
+        assert_eq!(new_state, last_state, "game state not identical");
 
         for game_state in game_states.into_iter().rev() {
             println!("undoing move {:?}", game.moves.last());
@@ -509,7 +538,7 @@ mod tests {
             };
             game = next_game;
             let new_state = serde_json::to_string(&game)?;
-            assert!(new_state == game_state, "game state not identical");
+            assert_eq!(new_state, game_state, "game state not identical");
         }
         Ok(())
     }
