@@ -13,11 +13,6 @@ use crate::{
     piece::{BLACK_PAWNS_STARTING_POSITIONS, WHITE_PAWNS_STARTING_POSITIONS},
 };
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize)]
-pub enum Marker {
-    MovementOption,
-}
-
 #[non_exhaustive]
 #[derive(Debug, Error)]
 pub enum MoveError {
@@ -63,9 +58,6 @@ pub struct MoveOption {
 pub struct Board {
     #[serde_as(as = "Vec<(Same, Same)>")]
     pub pieces: BTreeMap<Position, Piece>,
-
-    #[serde_as(as = "Vec<(Same, Same)>")]
-    pub markers: BTreeMap<Position, Marker>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -216,14 +208,6 @@ impl Board {
         options
     }
 
-    pub fn mark_move_options(&mut self, options: &[MoveOption]) {
-        self.markers.clear();
-
-        for MoveOption { pos, action: _ } in options {
-            self.markers.insert(*pos, Marker::MovementOption);
-        }
-    }
-
     // Moves a piece and removes anything at the destination from the board
     pub fn move_piece(&mut self, origin: Position, destination: Position) {
         let piece = self.pieces.remove(&origin).expect("No piece at origin");
@@ -237,12 +221,13 @@ mod tests {
     use crate::coordinates::HumanCoordinate;
     use crate::display::save_board_to_html_file;
     use crate::piece::PieceType;
+    use std::collections::HashSet;
     use std::path::PathBuf;
     use strum::IntoEnumIterator;
 
-    fn snap_board(board: &Board, snapshot_name: &str) {
+    fn snap_board(board: &Board, markers: &HashSet<Position>, snapshot_name: &str) {
         let path = get_html_repr_path(snapshot_name);
-        save_board_to_html_file(board, path).expect("html could not be generated");
+        save_board_to_html_file(board, markers, path).expect("html could not be generated");
     }
 
     fn get_html_repr_path(snapshot_name: &str) -> PathBuf {
@@ -263,8 +248,10 @@ mod tests {
                     .expect("error on movement options"),
             );
         }
-        board.mark_move_options(&options);
-        snap_board(&board, snapshot_name);
+
+        let markers: HashSet<Position> = options.iter().map(|x| x.pos).collect();
+
+        snap_board(&board, &markers, snapshot_name);
         insta::assert_debug_snapshot!(snapshot_name, options);
     }
 

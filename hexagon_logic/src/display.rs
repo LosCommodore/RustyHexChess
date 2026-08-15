@@ -1,6 +1,5 @@
 use crate::Side;
 use crate::board::Board;
-use crate::board::Marker;
 use crate::coordinates::{Position, X_RANGE, num_to_char_notation};
 use ansi_to_html::convert;
 use crossterm::style::{Color, SetBackgroundColor, SetForegroundColor};
@@ -11,6 +10,7 @@ use crossterm::{
 };
 use crossterm::{cursor::Show, style::ResetColor};
 use crossterm::{execute, style::Print};
+use std::collections::HashSet;
 use std::fs::File;
 use std::io::BufWriter;
 use std::io::{Write, stdout};
@@ -32,7 +32,7 @@ pub enum DisplayError {
 pub type Result<T> = std::result::Result<T, DisplayError>;
 
 pub trait BoardDisplay {
-    fn display(&self, board: &Board) -> Result<()>;
+    fn display(&self, board: &Board, markers: &HashSet<Position>) -> Result<()>;
 }
 
 pub struct ChessTerminal;
@@ -51,15 +51,15 @@ impl Drop for ChessTerminal {
 }
 
 impl BoardDisplay for ChessTerminal {
-    fn display(&self, board: &Board) -> Result<()> {
+    fn display(&self, board: &Board, markers: &HashSet<Position>) -> Result<()> {
         let mut out = stdout();
-        write_board(board, &mut out)?;
+        write_board(board, markers, &mut out)?;
         out.flush()?;
         Ok(())
     }
 }
 
-pub fn write_board(board: &Board, out: &mut impl Write) -> Result<()> {
+pub fn write_board(board: &Board, markers: &HashSet<Position>, out: &mut impl Write) -> Result<()> {
     let mut columns = EDGE_LEN;
     let mut space_count = 0isize;
     for (y, x_range) in X_RANGE.iter().enumerate() {
@@ -74,7 +74,7 @@ pub fn write_board(board: &Board, out: &mut impl Write) -> Result<()> {
 
         for x in x_range.0..=x_range.1 {
             let pos = Position { y, x };
-            print_cell(board, pos, out)?;
+            print_cell(board, pos, &markers, out)?;
         }
         print_diagonal_column_label(out, y)?;
         write!(out, "\r\n")?;
@@ -89,9 +89,9 @@ pub fn write_board(board: &Board, out: &mut impl Write) -> Result<()> {
     Ok(())
 }
 
-pub fn write_html(board: &Board, out: &mut impl Write) -> Result<()> {
+pub fn write_html(board: &Board, markers: &HashSet<Position>, out: &mut impl Write) -> Result<()> {
     let mut buffer = Vec::new();
-    write_board(board, &mut buffer)?;
+    write_board(board, markers, &mut buffer)?;
     let ansi_string = String::from_utf8_lossy(&buffer);
 
     let html_content = convert(&ansi_string)
@@ -106,17 +106,26 @@ pub fn write_html(board: &Board, out: &mut impl Write) -> Result<()> {
     Ok(())
 }
 
-pub fn save_board_to_html_file(board: &Board, file_path: impl AsRef<Path>) -> Result<()> {
+pub fn save_board_to_html_file(
+    board: &Board,
+    markers: &HashSet<Position>,
+    file_path: impl AsRef<Path>,
+) -> Result<()> {
     let file_path = &file_path.as_ref();
 
     let file = File::create(Path::new(file_path))?;
     let mut writer = BufWriter::new(file);
-    write_html(board, &mut writer)?;
+    write_html(board, markers, &mut writer)?;
     writer.flush()?;
     Ok(())
 }
 
-fn print_cell(board: &Board, pos: Position, out: &mut impl Write) -> Result<()> {
+fn print_cell(
+    board: &Board,
+    pos: Position,
+    markers: &HashSet<Position>,
+    out: &mut impl Write,
+) -> Result<()> {
     let piece = board.pieces.get(&pos);
 
     let foreground_color = match piece {
@@ -134,12 +143,11 @@ fn print_cell(board: &Board, pos: Position, out: &mut impl Write) -> Result<()> 
 
     let symbol: String = format!("[ {symbol} ]");
 
-    let cell_color = board
-        .markers
-        .get(&pos)
-        .map_or(Color::Reset, |marker| match marker {
-            Marker::MovementOption => Color::DarkYellow,
-        });
+    let cell_color = if markers.contains(&pos) {
+        Color::DarkYellow
+    } else {
+        Color::Reset
+    };
 
     execute!(
         out,

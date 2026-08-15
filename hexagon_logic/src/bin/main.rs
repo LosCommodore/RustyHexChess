@@ -1,10 +1,10 @@
 #![allow(unused)]
 
-use std::error::Error;
+use std::{error::Error, marker};
 
 use hexagon_logic::{
     Game, NextTurn, Side,
-    board::{Board, Marker},
+    board::Board,
     coordinates::Position,
     display::{self, save_board_to_html_file, write_html},
     new_game,
@@ -38,12 +38,12 @@ fn main() -> Result<()> {
         panic!("??")
     };
 
-    game.mark_move_options(('B', 6));
-
-    terminal.display(game.board())?;
+    let mv_options = game.get_movement_options(('B', 6).try_into().unwrap())?;
+    let markers = mv_options.iter().map(|x| x.pos).collect();
+    terminal.display(game.board(), &markers)?;
 
     let mut output_dir = find_output_directory();
     output_dir.push("my_board.html");
-    save_board_to_html_file(game.board(), output_dir)?;
+    save_board_to_html_file(game.board(), &markers, output_dir)?;
     Ok(())
 }
