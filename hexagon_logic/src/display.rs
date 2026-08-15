@@ -74,7 +74,7 @@ pub fn write_board(board: &Board, markers: &HashSet<Position>, out: &mut impl Wr
 
         for x in x_range.0..=x_range.1 {
             let pos = Position { y, x };
-            print_cell(board, pos, &markers, out)?;
+            print_cell(board, pos, markers, out)?;
         }
         print_diagonal_column_label(out, y)?;
         write!(out, "\r\n")?;

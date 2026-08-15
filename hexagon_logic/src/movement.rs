@@ -37,7 +37,7 @@ pub enum MovementPattern {
     Pawn,
 }
 
-const ROOK_MOVEMENTS: &'static [MovementPattern] = &[
+const ROOK_MOVEMENTS: &[MovementPattern] = &[
     MovementPattern::Walk {
         direction: UP,
         limit: None,
@@ -64,12 +64,12 @@ const ROOK_MOVEMENTS: &'static [MovementPattern] = &[
     },
 ];
 
-const KING_MOVEMENTS: &'static [MovementPattern] = &[MovementPattern::Step(&[
+const KING_MOVEMENTS: &[MovementPattern] = &[MovementPattern::Step(&[
     UP, DOWN, UP_LEFT, DOWN_RIGHT, UP_RIGHT, DOWN_LEFT, EDGE_1, EDGE_2, EDGE_3, EDGE_4, EDGE_5,
     EDGE_6,
 ])];
 
-const BISHOP_MOVEMENTS: &'static [MovementPattern] = &[
+const BISHOP_MOVEMENTS: &[MovementPattern] = &[
     MovementPattern::Walk {
         direction: EDGE_1,
         limit: None,
@@ -96,7 +96,7 @@ const BISHOP_MOVEMENTS: &'static [MovementPattern] = &[
     },
 ];
 
-const QUEEN_MOVEMENTS: &'static [MovementPattern] = &[
+const QUEEN_MOVEMENTS: &[MovementPattern] = &[
     MovementPattern::Walk {
         direction: UP,
         limit: None,
@@ -147,7 +147,7 @@ const QUEEN_MOVEMENTS: &'static [MovementPattern] = &[
     },
 ];
 
-const KNIGHT_MOVEMENTS: &'static [MovementPattern] = &[MovementPattern::Step(&[
+const KNIGHT_MOVEMENTS: &[MovementPattern] = &[MovementPattern::Step(&[
     (2, 1),
     (1, 2),
     (3, -1),

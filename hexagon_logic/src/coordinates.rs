@@ -2,8 +2,7 @@ use std::fmt::{self};
 
 use serde::Serialize;
 
-/// Internal range for 2nd Dimension, zero-indexed, open interval
-
+// Internal range for 2nd Dimension, zero-indexed, open interval
 pub const BOARD_DIM: usize = 11;
 pub const X_RANGE: [(usize, usize); BOARD_DIM] = [
     (5, 10),
@@ -42,7 +41,7 @@ impl Position {
 
 impl fmt::Display for Position {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Ok(human) = HumanCoordinate::try_from(self.clone()) else {
+        let Ok(human) = HumanCoordinate::try_from(*self) else {
             return write!(f, "ERROR, invalid coordinate");
         };
         _ = write!(f, "Raw: {self:?} === {human:?} ");

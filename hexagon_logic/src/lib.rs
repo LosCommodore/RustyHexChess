@@ -221,7 +221,7 @@ impl Game<NormalTurn> {
                 Side::White => &WHITE_PAWNS_PROMOTION_POSITIONS,
             };
 
-            let is_promotion = promotion_fields.iter().any(|x| *x == destination);
+            let is_promotion = promotion_fields.contains(&destination);
             if is_promotion {
                 return Ok(NextTurn::PromotionRequired(self.transition(PromotePawn)));
             }
@@ -269,25 +269,23 @@ impl Game<NormalTurn> {
     pub fn undo(mut self) -> GameResult<Self> {
         let mv = self.undo_move();
         match mv {
-            None => {
-                return Err(GameError {
-                    game: self,
-                    error: UserError::CannotUndo,
-                });
-            }
+            None => Err(GameError {
+                game: self,
+                error: UserError::CannotUndo,
+            }),
             Some(Move {
                 action: Action::Capture { .. } | Action::Move,
                 ..
             }) => {
                 self.active_side = !self.active_side;
-                return Ok(NextTurn::Continued(self.transition(NormalTurn)));
+                Ok(NextTurn::Continued(self.transition(NormalTurn)))
             }
             Some(Move {
                 action: Action::Promote { .. },
                 ..
             }) => {
                 self.active_side = !self.active_side;
-                return Ok(NextTurn::PromotionRequired(self.transition(PromotePawn)));
+                Ok(NextTurn::PromotionRequired(self.transition(PromotePawn)))
             }
         }
     }
@@ -309,7 +307,7 @@ impl Game<PromotePawn> {
         self.board.pieces.insert(destination, new_piece.clone());
         self.moves.push(Move {
             origin: destination,
-            destination: destination,
+            destination,
             action: Action::Promote { to: new_piece },
         });
         self.next_turn();
@@ -320,24 +318,18 @@ impl Game<PromotePawn> {
     pub fn undo(mut self) -> GameResult<Self> {
         let mv = self.undo_move();
         match mv {
-            None => {
-                return Err(GameError {
-                    game: self,
-                    error: UserError::CannotUndo,
-                });
-            }
+            None => Err(GameError {
+                game: self,
+                error: UserError::CannotUndo,
+            }),
             Some(Move {
                 action: Action::Capture { .. } | Action::Move,
                 ..
-            }) => {
-                return Ok(NextTurn::Continued(self.transition(NormalTurn)));
-            }
+            }) => Ok(NextTurn::Continued(self.transition(NormalTurn))),
             Some(Move {
                 action: Action::Promote { .. },
                 ..
-            }) => {
-                return Ok(NextTurn::PromotionRequired(self.transition(PromotePawn)));
-            }
+            }) => Ok(NextTurn::PromotionRequired(self.transition(PromotePawn))),
         }
     }
 }

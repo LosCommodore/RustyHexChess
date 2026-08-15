@@ -33,13 +33,13 @@ type Result<T> = std::result::Result<T, super::MoveError>;
 
 /// Possible Actions for a Piece
 /// Note:
-/// - There is no castling
-/// The Pawn is the special case:
-/// - The pawn may move one vacant cell vertically forward.
-///   1. If it stands on its starting cell or on the starting cell of any other pawn of its color,
+///     - There is no castling
+///     - The Pawn is the special case:
+/// The pawn may move one vacant cell vertically forward.
+///     1. If it stands on its starting cell or on the starting cell of any other pawn of its color,
 ///      then it is also allowed to move two vacant cells vertically forward.
-///   2. It may capture one cell orthogonally forward at a 60° angle to the vertical, including capturing en passant.
-///   3. It is promoted when it reaches the end of any file.
+///     2. It may capture one cell orthogonally forward at a 60° angle to the vertical, including capturing en passant.
+///     3. It is promoted when it reaches the end of any file.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub enum Action {
     Move,
@@ -80,7 +80,7 @@ impl Board {
                 MovementPattern::Walk { direction, limit } => {
                     moves.extend(self.get_walk_moves(me, pos, *direction, *limit, Capability::Both))
                 }
-                MovementPattern::Step(steps) => moves.extend(self.get_step_moves(me, pos, *steps)),
+                MovementPattern::Step(steps) => moves.extend(self.get_step_moves(me, pos, steps)),
                 MovementPattern::Pawn => moves.extend(self.get_pawn_moves(me, pos)),
             }
         }
@@ -95,12 +95,8 @@ impl Board {
         dx: isize,
         capture_mode: Capability,
     ) -> Option<MoveOption> {
-        let Some(y) = pos.y.checked_add_signed(dy) else {
-            return None;
-        };
-        let Some(x) = pos.x.checked_add_signed(dx) else {
-            return None;
-        };
+        let y = pos.y.checked_add_signed(dy)?;
+        let x = pos.x.checked_add_signed(dx)?;
 
         let pos = Position { y, x };
         if !pos.is_on_board() {
@@ -128,7 +124,7 @@ impl Board {
         match capture_mode {
             Capability::Capture => None,
             _ => Some(MoveOption {
-                pos: pos,
+                pos,
                 action: Action::Move,
             }),
         }
