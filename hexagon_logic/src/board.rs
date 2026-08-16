@@ -43,7 +43,7 @@ type Result<T> = std::result::Result<T, super::MoveError>;
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub enum Action {
     Move,
-    Capture { piece: Piece, pos: Position }, // pos for en passant capture
+    Capture { enemy: Piece, pos: Position }, // pos for en passant capture
     Promote { to: Piece },
 }
 
@@ -115,7 +115,7 @@ impl Board {
                             origin,
                             destination,
                             action: Action::Capture {
-                                piece: enemy_piece.clone(),
+                                enemy: enemy_piece.clone(),
                                 pos: destination,
                             },
                         });
@@ -236,7 +236,7 @@ impl Board {
             }
             Action::Capture {
                 pos: enemy_pos,
-                piece: taken_piece,
+                enemy: taken_piece,
             } => {
                 self.pieces.insert(*enemy_pos, taken_piece.clone());
                 self.pieces.insert(game_move.origin, me);
