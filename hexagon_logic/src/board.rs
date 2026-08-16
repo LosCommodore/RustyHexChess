@@ -19,8 +19,8 @@ pub enum MoveError {
     #[error("Given position {0} is outside of the board")]
     OutsideBoard(Position),
 
-    #[error("no piece at source position")]
-    NoPieceAtPosition,
+    #[error("no piece at position: {0}")]
+    NoPieceAtPosition(Position),
 
     #[error("destination is not reachable")]
     IllegalMove,
@@ -69,7 +69,10 @@ pub enum Capability {
 
 impl Board {
     pub fn get_movement_options(&self, pos: Position) -> Result<Vec<MoveOption>> {
-        let me = self.pieces.get(&pos).ok_or(MoveError::NoPieceAtPosition)?;
+        let me = self
+            .pieces
+            .get(&pos)
+            .ok_or(MoveError::NoPieceAtPosition(pos))?;
 
         let mut moves = Vec::new();
         for p in get_movement_patterns(me.piece_type()) {

@@ -40,8 +40,11 @@ pub struct GameError<T> {
 }
 
 impl<G> GameError<G> {
-    fn new(game: G, error: UserError) -> Self {
-        Self { game, error }
+    fn new(game: G, error: impl Into<UserError>) -> Self {
+        Self {
+            game,
+            error: error.into(),
+        }
     }
 }
 
@@ -168,10 +171,7 @@ impl Game<NormalTurn> {
         let origin = match Position::from_human(origin) {
             Ok(x) => x,
             Err(e) => {
-                return Err(GameError {
-                    game: self,
-                    error: e.into(),
-                });
+                return Err(GameError::new(self, e));
             }
         };
 
@@ -188,40 +188,38 @@ impl Game<NormalTurn> {
         self.make_move(origin, destination)
     }
 
+    fn validate_move(
+        &self,
+        origin: Position,
+        destination: Position,
+    ) -> Result<(Piece, MoveOption)> {
+        let piece = self
+            .board
+            .pieces
+            .get(&origin)
+            .ok_or(MoveError::NoPieceAtPosition(origin))?;
+
+        if piece.side != self.active_side {
+            return Err(UserError::WrongPlayer);
+        }
+
+        let options = self.board.get_movement_options(origin)?;
+
+        let option = options
+            .iter()
+            .find(|option| option.pos == destination)
+            .cloned()
+            .ok_or(MoveError::IllegalMove)?;
+
+        Ok((piece.clone(), option))
+    }
+
     /// Make a move on the board. Move must be valid, otherwise an error will be returned
     pub fn make_move(mut self, origin: Position, destination: Position) -> GameResult<Self> {
-        let Some(&Piece {
-            side, piece_type, ..
-        }) = self.board.pieces.get(&origin)
-        else {
-            let err = GameError::new(self, MoveError::NoPieceAtPosition.into());
-            return Err(err);
+        let (piece, move_) = match self.validate_move(origin, destination) {
+            Ok((piece, move_)) => (piece, move_),
+            Err(e) => return Err(GameError::new(self, e)),
         };
-
-        if side != self.active_side {
-            return Err(GameError::new(self, UserError::WrongPlayer));
-        }
-
-        let options = match self.board.get_movement_options(origin) {
-            Ok(x) => x,
-            Err(err) => return Err(GameError::new(self, err.into())),
-        };
-
-        let Some(valid_move) = options.iter().find(|option| option.pos == destination) else {
-            return Err(GameError::new(self, MoveError::IllegalMove.into()));
-        };
-
-        let target_occupied = self.board.pieces.contains_key(&destination);
-
-        match valid_move.action {
-            Action::Move => {
-                assert!(!target_occupied, "Move action targeted an occupied square!")
-            }
-            Action::Capture { .. } => {
-                assert!(target_occupied, "Capture action targeted an empty square!")
-            }
-            Action::Promote { .. } => panic!("Promotion not possible here"),
-        }
 
         // -- Normal move logic
         self.board.move_piece(origin, destination);
@@ -229,12 +227,12 @@ impl Game<NormalTurn> {
         self.moves.push(Move {
             origin,
             destination,
-            action: valid_move.action.clone(),
+            action: move_.action.clone(),
         });
 
         // -- Promotion logic
-        if piece_type == PieceType::Pawn {
-            let promotion_fields = match side {
+        if piece.piece_type == PieceType::Pawn {
+            let promotion_fields = match piece.side {
                 Side::Black => &BLACK_PAWNS_PROMOTION_POSITIONS,
                 Side::White => &WHITE_PAWNS_PROMOTION_POSITIONS,
             };
