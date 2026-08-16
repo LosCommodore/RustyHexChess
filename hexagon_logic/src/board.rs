@@ -69,9 +69,6 @@ pub enum Capability {
 
 impl Board {
     pub fn get_movement_options(&self, pos: Position) -> Result<Vec<MoveOption>> {
-        if !pos.is_on_board() {
-            return Err(MoveError::OutsideBoard(pos));
-        }
         let me = self.pieces.get(&pos).ok_or(MoveError::NoPieceAtPosition)?;
 
         let mut moves = Vec::new();
@@ -95,14 +92,12 @@ impl Board {
         dx: isize,
         capture_mode: Capability,
     ) -> Option<MoveOption> {
-        let y = pos.y.checked_add_signed(dy)?;
-        let x = pos.x.checked_add_signed(dx)?;
+        let (mut y, mut x) = pos.pos();
 
-        let pos = Position { y, x };
-        if !pos.is_on_board() {
-            return None;
-        }
+        y = y.checked_add_signed(dy)?;
+        x = x.checked_add_signed(dx)?;
 
+        let pos = Position::new(y, x).ok()?;
         if let Some(piece) = self.pieces.get(&pos) {
             if piece.side() == my_side {
                 return None;
@@ -214,7 +209,6 @@ impl Board {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::coordinates::HumanCoordinate;
     use crate::display::save_board_to_html_file;
     use crate::piece::PieceType;
     use std::collections::HashSet;
@@ -251,9 +245,8 @@ mod tests {
         insta::assert_debug_snapshot!(snapshot_name, options);
     }
 
-    fn move_piece(pos: HumanCoordinate, piece: Piece, snapshot_name: &str) -> Board {
+    fn move_piece(pos: Position, piece: Piece, snapshot_name: &str) -> Board {
         let mut board = Board::default();
-        let pos = Position::try_from(pos).expect("invalid position");
         board.pieces.insert(pos, piece);
         mark_and_snap(&mut board, &[pos], snapshot_name);
         board
@@ -265,7 +258,11 @@ mod tests {
             piece_type: PieceType::Rook,
             side: Side::Black,
         };
-        move_piece(('F', 5), piece, "test_move_rook");
+        move_piece(
+            Position::from_human(('F', 5)).unwrap(),
+            piece,
+            "test_move_rook",
+        );
     }
 
     #[test]
@@ -274,7 +271,11 @@ mod tests {
             piece_type: PieceType::Queen,
             side: Side::Black,
         };
-        move_piece(('F', 5), piece, "test_move_queen");
+        move_piece(
+            Position::from_human(('F', 5)).unwrap(),
+            piece,
+            "test_move_queen",
+        );
     }
 
     #[test]
@@ -283,7 +284,11 @@ mod tests {
             piece_type: PieceType::King,
             side: Side::Black,
         };
-        move_piece(('F', 5), piece, "test_move_king");
+        move_piece(
+            Position::from_human(('F', 5)).unwrap(),
+            piece,
+            "test_move_king",
+        );
     }
 
     #[test]
@@ -292,7 +297,11 @@ mod tests {
             piece_type: PieceType::Bishop,
             side: Side::Black,
         };
-        move_piece(('F', 5), piece, "test_move_bishop");
+        move_piece(
+            Position::from_human(('F', 5)).unwrap(),
+            piece,
+            "test_move_bishop",
+        );
     }
 
     #[test]
@@ -301,7 +310,11 @@ mod tests {
             piece_type: PieceType::Knight,
             side: Side::Black,
         };
-        move_piece(('F', 5), piece, "test_move_knight");
+        move_piece(
+            Position::from_human(('F', 5)).unwrap(),
+            piece,
+            "test_move_knight",
+        );
     }
 
     #[test]
@@ -310,7 +323,11 @@ mod tests {
             piece_type: PieceType::Pawn,
             side: Side::Black,
         };
-        move_piece(('F', 5), piece, "test_move_pawn_black");
+        move_piece(
+            Position::from_human(('F', 5)).unwrap(),
+            piece,
+            "test_move_pawn_black",
+        );
     }
 
     #[test]
@@ -319,7 +336,11 @@ mod tests {
             piece_type: PieceType::Pawn,
             side: Side::White,
         };
-        move_piece(('F', 5), piece, "test_move_pawn_white");
+        move_piece(
+            Position::from_human(('F', 5)).unwrap(),
+            piece,
+            "test_move_pawn_white",
+        );
     }
 
     #[test]
@@ -353,7 +374,7 @@ mod tests {
     #[test]
     fn test_capture_with_pawn() {
         let mut board = Board::default();
-        let pos = ('F', 5).try_into().unwrap();
+        let pos = Position::from_human(('F', 5)).unwrap();
         board.pieces.insert(
             pos,
             Piece {
@@ -362,14 +383,14 @@ mod tests {
             },
         );
         board.pieces.insert(
-            ('G', 5).try_into().unwrap(),
+            Position::from_human(('G', 5)).unwrap(),
             Piece {
                 piece_type: PieceType::Bishop,
                 side: Side::Black,
             },
         );
         board.pieces.insert(
-            ('E', 6).try_into().unwrap(),
+            Position::from_human(('E', 6)).unwrap(),
             Piece {
                 piece_type: PieceType::Queen,
                 side: Side::Black,
@@ -381,7 +402,7 @@ mod tests {
     #[test]
     fn test_normal_capture() {
         let mut board = Board::default();
-        let pos = ('F', 5).try_into().unwrap();
+        let pos = Position::from_human(('F', 5)).unwrap();
         board.pieces.insert(
             pos,
             Piece {
@@ -390,14 +411,14 @@ mod tests {
             },
         );
         board.pieces.insert(
-            ('F', 8).try_into().unwrap(),
+            Position::from_human(('F', 8)).unwrap(),
             Piece {
                 piece_type: PieceType::King,
                 side: Side::Black,
             },
         );
         board.pieces.insert(
-            ('I', 8).try_into().unwrap(),
+            Position::from_human(('I', 8)).unwrap(),
             Piece {
                 piece_type: PieceType::King,
                 side: Side::White,

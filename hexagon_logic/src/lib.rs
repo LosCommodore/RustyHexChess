@@ -8,7 +8,7 @@ use std::{collections::HashMap, ops::Not};
 
 use crate::{
     board::{Action, Board, MoveError, MoveOption},
-    coordinates::Position,
+    coordinates::{HumanNotation, Position},
     piece::{
         BLACK_PAWNS_PROMOTION_POSITIONS, Piece, PieceType, WHITE_PAWNS_PROMOTION_POSITIONS,
         get_startup_pieces_black, get_startup_pieces_white,
@@ -22,6 +22,9 @@ use strum::EnumIter;
 pub enum UserError {
     #[error(transparent)]
     MoveError(#[from] board::MoveError),
+
+    #[error(transparent)]
+    CoordinateError(#[from] coordinates::CoordinateError),
 
     #[error("piece belongs to the other player")]
     WrongPlayer,
@@ -156,22 +159,37 @@ impl<T> Game<T> {
 }
 
 impl Game<NormalTurn> {
+    // Make a move using human coordinates
+    pub fn make_human_move(
+        self,
+        origin: HumanNotation,
+        destination: HumanNotation,
+    ) -> GameResult<Self> {
+        let origin = match Position::from_human(origin) {
+            Ok(x) => x,
+            Err(e) => {
+                return Err(GameError {
+                    game: self,
+                    error: e.into(),
+                });
+            }
+        };
+
+        let destination = match Position::from_human(destination) {
+            Ok(x) => x,
+            Err(e) => {
+                return Err(GameError {
+                    game: self,
+                    error: e.into(),
+                });
+            }
+        };
+
+        self.make_move(origin, destination)
+    }
+
     /// Make a move on the board. Move must be valid, otherwise an error will be returned
-    pub fn make_move<T, U>(mut self, origin_pos: T, destination_pos: U) -> GameResult<Self>
-    where
-        T: TryInto<Position>,
-        T::Error: std::fmt::Debug, // Accepts () or Infallible or any Debug type
-        U: TryInto<Position>,
-        U::Error: std::fmt::Debug,
-    {
-        let Ok(origin) = origin_pos.try_into() else {
-            return Err(GameError::new(self, MoveError::InvalidPosition.into()));
-        };
-
-        let Ok(destination) = destination_pos.try_into() else {
-            return Err(GameError::new(self, MoveError::InvalidPosition.into()));
-        };
-
+    pub fn make_move(mut self, origin: Position, destination: Position) -> GameResult<Self> {
         let Some(&Piece {
             side, piece_type, ..
         }) = self.board.pieces.get(&origin)
@@ -355,8 +373,8 @@ mod tests {
     fn test_promote_pawn() {
         // -- Create game with pawn
         let mut board = Board::default();
-        let origin: Position = ('K', 5).try_into().unwrap();
-        let destination: Position = ('K', 6).try_into().unwrap();
+        let origin: Position = Position::from_human(('K', 5)).unwrap();
+        let destination: Position = Position::from_human(('K', 6)).unwrap();
 
         board.pieces.insert(
             origin,
@@ -407,7 +425,7 @@ mod tests {
     fn test_check() -> Result<()> {
         let mut board = Board::default();
         board.pieces.insert(
-            ('F', 5).try_into().unwrap(),
+            Position::from_human(('F', 5)).unwrap(),
             Piece {
                 piece_type: PieceType::King,
                 side: Side::White,
@@ -420,7 +438,7 @@ mod tests {
         assert!(!is_check, "expected no check here 1");
 
         game.board.pieces.insert(
-            ('K', 5).try_into().unwrap(),
+            Position::from_human(('K', 5)).unwrap(),
             Piece {
                 piece_type: PieceType::Bishop,
                 side: Side::White,
@@ -431,7 +449,7 @@ mod tests {
         assert!(!is_check, "expected no check here 2");
 
         game.board.pieces.insert(
-            ('F', 1).try_into().unwrap(),
+            Position::from_human(('F', 1)).unwrap(),
             Piece {
                 piece_type: PieceType::Rook,
                 side: Side::Black,
@@ -448,7 +466,7 @@ mod tests {
     fn test_undo() -> Result<()> {
         let mut board = Board::default();
         board.pieces.insert(
-            ('F', 5).try_into().unwrap(),
+            Position::from_human(('F', 5)).unwrap(),
             Piece {
                 piece_type: PieceType::King,
                 side: Side::White,
@@ -456,14 +474,14 @@ mod tests {
         );
 
         board.pieces.insert(
-            ('I', 2).try_into().unwrap(),
+            Position::from_human(('I', 2)).unwrap(),
             Piece {
                 piece_type: PieceType::King,
                 side: Side::Black,
             },
         );
 
-        let origin = ('F', 9).try_into().unwrap();
+        let origin = Position::from_human(('F', 9)).unwrap();
         board.pieces.insert(
             origin,
             Piece {
@@ -473,7 +491,7 @@ mod tests {
         );
 
         board.pieces.insert(
-            ('G', 9).try_into().unwrap(),
+            Position::from_human(('G', 9)).unwrap(),
             Piece {
                 piece_type: PieceType::Bishop,
                 side: Side::Black,
@@ -485,22 +503,27 @@ mod tests {
         let mut game_states = Vec::new();
         game_states.push(serde_json::to_string(&game)?);
 
-        let NextTurn::Continued(game) = game.make_move(origin, ('G', 9)).map_err(|e| e.error)?
+        let NextTurn::Continued(game) = game
+            .make_move(origin, Position::from_human(('G', 9)).unwrap())
+            .map_err(|e| e.error)?
         else {
             bail!("wrong game state 1")
         };
         game_states.push(serde_json::to_string(&game)?);
 
         // Black King moves
-        let NextTurn::Continued(game) = game.make_move(('I', 2), ('I', 3)).map_err(|e| e.error)?
+        let NextTurn::Continued(game) = game
+            .make_human_move(('I', 2), ('I', 3))
+            .map_err(|e| e.error)?
         else {
             bail!("Wrong game state 2")
         };
         let last_state = serde_json::to_string(&game)?;
 
         // White Pawn moves
-        let NextTurn::PromotionRequired(game) =
-            game.make_move(('G', 9), ('G', 10)).map_err(|e| e.error)?
+        let NextTurn::PromotionRequired(game) = game
+            .make_human_move(('G', 9), ('G', 10))
+            .map_err(|e| e.error)?
         else {
             bail!("Wrong game state 3")
         };

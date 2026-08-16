@@ -73,7 +73,7 @@ pub fn write_board(board: &Board, markers: &HashSet<Position>, out: &mut impl Wr
         execute!(out, Print(whitespace), Print(format!("{char_notation}  ")))?;
 
         for x in x_range.0..=x_range.1 {
-            let pos = Position { y, x };
+            let pos = Position::new(y, x).expect("invalid position ???");
             print_cell(board, pos, markers, out)?;
         }
         print_diagonal_column_label(out, y)?;

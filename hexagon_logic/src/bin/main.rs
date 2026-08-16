@@ -33,12 +33,14 @@ fn main() -> Result<()> {
     let mut game = new_game(None);
     let terminal = ChessTerminal;
 
-    let NextTurn::Continued(mut game) = game.make_move(('B', 5), ('B', 6)).map_err(|e| e.error)?
+    let NextTurn::Continued(mut game) = game
+        .make_human_move(('B', 5), ('B', 6))
+        .map_err(|e| e.error)?
     else {
         panic!("??")
     };
 
-    let mv_options = game.get_movement_options(('B', 6).try_into().unwrap())?;
+    let mv_options = game.get_movement_options(Position::from_human(('B', 6)).unwrap())?;
     let markers = mv_options.iter().map(|x| x.pos).collect();
     terminal.display(game.board(), &markers)?;
 

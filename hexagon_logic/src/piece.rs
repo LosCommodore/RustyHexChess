@@ -6,55 +6,55 @@ use anyhow::{Ok, Result};
 use serde::Serialize;
 
 pub const WHITE_PAWNS_STARTING_POSITIONS: [Position; 9] = [
-    Position { y: 1, x: 4 }, // ('B', 5))
-    Position { y: 2, x: 4 }, // ('C', 5))
-    Position { y: 3, x: 4 }, // ('D', 5))
-    Position { y: 4, x: 4 }, // ('E', 5))
-    Position { y: 5, x: 4 }, // ('F', 5))
-    Position { y: 6, x: 3 }, // ('G', 4))
-    Position { y: 7, x: 2 }, // ('H', 3))
-    Position { y: 8, x: 1 }, // ('I', 2))
-    Position { y: 9, x: 0 }, // ('J', 1))
+    Position::new_const(1, 4), // ('B', 5))
+    Position::new_const(2, 4), // ('C', 5))
+    Position::new_const(3, 4), // ('D', 5))
+    Position::new_const(4, 4), // ('E', 5))
+    Position::new_const(5, 4), // ('F', 5))
+    Position::new_const(6, 3), // ('G', 4))
+    Position::new_const(7, 2), // ('H', 3))
+    Position::new_const(8, 1), // ('I', 2))
+    Position::new_const(9, 0), // ('J', 1))
 ];
 
 pub const BLACK_PAWNS_STARTING_POSITIONS: [Position; 9] = [
-    Position { y: 1, x: 10 }, // ('B', 11)
-    Position { y: 2, x: 9 },  // ('C', 10)
-    Position { y: 3, x: 8 },  // ('D', 9)
-    Position { y: 4, x: 7 },  // ('E', 8)
-    Position { y: 5, x: 6 },  // ('F', 7)
-    Position { y: 6, x: 6 },  // ('G', 7)
-    Position { y: 7, x: 6 },  // ('H', 7)
-    Position { y: 8, x: 6 },  // ('I', 7)
-    Position { y: 9, x: 6 },  // ('J', 7)
+    Position::new_const(1, 10), // ('B', 11)
+    Position::new_const(2, 9),  // ('C', 10)
+    Position::new_const(3, 8),  // ('D', 9)
+    Position::new_const(4, 7),  // ('E', 8)
+    Position::new_const(5, 6),  // ('F', 7)
+    Position::new_const(6, 6),  // ('G', 7)
+    Position::new_const(7, 6),  // ('H', 7)
+    Position::new_const(8, 6),  // ('I', 7)
+    Position::new_const(9, 6),  // ('J', 7)
 ];
 
 pub const WHITE_PAWNS_PROMOTION_POSITIONS: [Position; 11] = [
-    Position { y: 0, x: 10 },
-    Position { y: 1, x: 10 },
-    Position { y: 2, x: 10 },
-    Position { y: 3, x: 10 },
-    Position { y: 4, x: 10 },
-    Position { y: 5, x: 10 },
-    Position { y: 6, x: 9 },
-    Position { y: 7, x: 8 },
-    Position { y: 8, x: 7 },
-    Position { y: 9, x: 6 },
-    Position { y: 10, x: 5 },
+    Position::new_const(0, 10),
+    Position::new_const(1, 10),
+    Position::new_const(2, 10),
+    Position::new_const(3, 10),
+    Position::new_const(4, 10),
+    Position::new_const(5, 10),
+    Position::new_const(6, 9),
+    Position::new_const(7, 8),
+    Position::new_const(8, 7),
+    Position::new_const(9, 6),
+    Position::new_const(10, 5),
 ];
 
 pub const BLACK_PAWNS_PROMOTION_POSITIONS: [Position; 11] = [
-    Position { y: 0, x: 5 },
-    Position { y: 1, x: 4 },
-    Position { y: 2, x: 3 },
-    Position { y: 3, x: 2 },
-    Position { y: 4, x: 1 },
-    Position { y: 5, x: 0 },
-    Position { y: 6, x: 0 },
-    Position { y: 7, x: 0 },
-    Position { y: 8, x: 0 },
-    Position { y: 9, x: 0 },
-    Position { y: 10, x: 0 },
+    Position::new_const(0, 5),
+    Position::new_const(1, 4),
+    Position::new_const(2, 3),
+    Position::new_const(3, 2),
+    Position::new_const(4, 1),
+    Position::new_const(5, 0),
+    Position::new_const(6, 0),
+    Position::new_const(7, 0),
+    Position::new_const(8, 0),
+    Position::new_const(9, 0),
+    Position::new_const(10, 0),
 ];
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize)]
@@ -100,9 +100,9 @@ pub fn get_startup_pieces_black() -> HashMap<Position, Piece> {
     let color = Side::Black;
     let mut out = HashMap::new();
 
-    let mut insert = |pos: HumanCoordinate, piece_type: PieceType| -> Result<()> {
+    let mut insert = |pos: HumanNotation, piece_type: PieceType| -> Result<()> {
         out.insert(
-            Position::try_from(pos).expect("invalid starting positions ??"),
+            Position::from_human(pos).expect("invalid starting positions ??"),
             Piece {
                 piece_type,
                 side: color,
@@ -137,9 +137,9 @@ pub fn get_startup_pieces_white() -> HashMap<Position, Piece> {
     let color = Side::White;
 
     let mut out = HashMap::new();
-    let mut insert = |pos: HumanCoordinate, piece_type: PieceType| -> Result<()> {
+    let mut insert = |pos: HumanNotation, piece_type: PieceType| -> Result<()> {
         out.insert(
-            Position::try_from(pos).expect("invalid starting positions ??"),
+            Position::from_human(pos).expect("invalid starting positions ??"),
             Piece {
                 piece_type,
                 side: color,
