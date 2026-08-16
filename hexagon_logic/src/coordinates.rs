@@ -126,4 +126,10 @@ mod tests {
         let human: HumanNotation = c.to_human();
         assert_eq!(human, ('B', 2));
     }
+
+    #[should_panic]
+    #[test]
+    fn new_invalid_position() {
+        let _ = Position::new(100, 100).unwrap();
+    }
 }
