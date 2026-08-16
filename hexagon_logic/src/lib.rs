@@ -7,7 +7,7 @@ pub mod piece;
 use std::{collections::HashMap, ops::Not};
 
 use crate::{
-    board::{Action, Board, MoveError, MoveOption},
+    board::{Action, Board, GameMove, MoveError},
     coordinates::{HumanNotation, Position},
     piece::{
         BLACK_PAWNS_PROMOTION_POSITIONS, Piece, PieceType, WHITE_PAWNS_PROMOTION_POSITIONS,
@@ -55,19 +55,11 @@ pub enum Side {
     Black,
 }
 
-#[allow(unused)]
-#[derive(Debug, Clone, Serialize)]
-pub struct Move {
-    origin: Position,
-    destination: Position,
-    action: Action,
-}
-
 #[derive(Default, Debug, Clone, Serialize)]
 pub struct Game<T> {
     board: Board,
     active_side: Side,
-    moves: Vec<Move>,
+    moves: Vec<GameMove>,
     _state: T,
 }
 
@@ -124,40 +116,20 @@ impl<T> Game<T> {
         self.active_side = !self.active_side;
     }
 
+    pub fn pieces_by_side(&self, side: Side) -> HashMap<Position, Piece> {
+        self.board
+            .pieces
+            .iter()
+            .filter(|(_, piece)| piece.side == side)
+            .map(|(&pos, piece)| (pos, piece.clone()))
+            .collect()
+    }
+
     // Helper function: undo the move but not the statemachine of the game
-    fn undo_move(&mut self) -> Option<Move> {
-        let move_ = self.moves.pop()?;
-        let move_clone = move_.clone();
-        let Move {
-            origin,
-            destination,
-            action,
-        } = move_;
-
-        match action {
-            Action::Move => {
-                self.board.move_piece(destination, origin);
-            }
-            Action::Capture { piece } => {
-                self.board.move_piece(destination, origin);
-                self.board.pieces.insert(destination, piece);
-            }
-            Action::Promote { .. } => {
-                let Move { destination, .. } = self
-                    .moves
-                    .last()
-                    .expect("Promotion without previous move ???");
-
-                self.board.pieces.insert(
-                    *destination,
-                    Piece {
-                        piece_type: PieceType::Pawn,
-                        side: self.active_side,
-                    },
-                );
-            }
-        }
-        Some(move_clone)
+    fn undo_move(&mut self) -> Option<GameMove> {
+        let game_move = self.moves.pop()?;
+        self.board.undo_game_move(&game_move);
+        Some(game_move)
     }
 }
 
@@ -188,11 +160,7 @@ impl Game<NormalTurn> {
         self.make_move(origin, destination)
     }
 
-    fn validate_move(
-        &self,
-        origin: Position,
-        destination: Position,
-    ) -> Result<(Piece, MoveOption)> {
+    fn validate_move(&self, origin: Position, destination: Position) -> Result<GameMove> {
         let piece = self
             .board
             .pieces
@@ -207,32 +175,27 @@ impl Game<NormalTurn> {
 
         let option = options
             .iter()
-            .find(|option| option.pos == destination)
+            .find(|option| option.destination == destination)
             .cloned()
             .ok_or(MoveError::IllegalMove)?;
 
-        Ok((piece.clone(), option))
+        Ok(option)
     }
 
     /// Make a move on the board. Move must be valid, otherwise an error will be returned
     pub fn make_move(mut self, origin: Position, destination: Position) -> GameResult<Self> {
-        let (piece, move_) = match self.validate_move(origin, destination) {
-            Ok((piece, move_)) => (piece, move_),
+        let game_move = match self.validate_move(origin, destination) {
+            Ok(game_move) => game_move,
             Err(e) => return Err(GameError::new(self, e)),
         };
 
         // -- Normal move logic
-        self.board.move_piece(origin, destination);
-
-        self.moves.push(Move {
-            origin,
-            destination,
-            action: move_.action.clone(),
-        });
+        self.board.execute_game_move(game_move.clone());
+        self.moves.push(game_move.clone());
 
         // -- Promotion logic
-        if piece.piece_type == PieceType::Pawn {
-            let promotion_fields = match piece.side {
+        if game_move.piece.piece_type == PieceType::Pawn {
+            let promotion_fields = match game_move.piece.side {
                 Side::Black => &BLACK_PAWNS_PROMOTION_POSITIONS,
                 Side::White => &WHITE_PAWNS_PROMOTION_POSITIONS,
             };
@@ -248,14 +211,13 @@ impl Game<NormalTurn> {
         Ok(NextTurn::Continued(self))
     }
 
-    pub fn get_movement_options(&self, pos: Position) -> Result<Vec<MoveOption>> {
+    pub fn get_movement_options(&self, pos: Position) -> Result<Vec<GameMove>> {
         self.board.get_movement_options(pos).map_err(|e| e.into())
         // todo -> add en passant
     }
 
-    pub fn king_in_check(&self) -> Result<bool> {
-        let enemy = !self.active_side;
-        let enemy_pieces = self.pieces_by_side(enemy);
+    pub fn king_in_check(&self, kings_side: Side) -> bool {
+        let enemy_pieces = self.pieces_by_side(!kings_side);
 
         let Some((&pos_king, _)) = self.board.pieces.iter().find(|(_, piece)| {
             piece.side == self.active_side && piece.piece_type == PieceType::King
@@ -265,21 +227,41 @@ impl Game<NormalTurn> {
 
         let is_check: bool = enemy_pieces.iter().any(|(&pos, _)| {
             self.get_movement_options(pos)
-                .map(|options| options.iter().any(|x| x.pos == pos_king))
+                .map(|options| options.iter().any(|x| x.destination == pos_king))
                 .unwrap_or(false)
         });
 
-        Ok(is_check)
+        is_check
     }
 
-    pub fn pieces_by_side(&self, side: Side) -> HashMap<Position, &Piece> {
-        self.board
-            .pieces
-            .iter()
-            .filter(|(_, piece)| piece.side == side)
-            .map(|(&pos, piece)| (pos, piece))
-            .collect()
+    /*
+    pub fn is_check_mate(&mut self) -> bool {
+        if !self.king_in_check(self.active_side) {
+            return false;
+        }
+
+        let my_pieces = self.pieces_by_side(self.active_side);
+
+        for (origin, _) in my_pieces {
+            let mv_options = self
+                .get_movement_options(origin)
+                .expect("A piece must be here");
+
+
+            for GameAction { destination, .. } in mv_options {
+                let taken = self.board.execute_action(origin, destination);
+                if !self.king_in_check(self.active_side) {
+                    return false;
+                }
+                self.board.execute_action(destination, origin);
+                if let Some(p) = taken {
+                    self.board.pieces.insert(destination, p);
+                };
+            }
+        }
+        true
     }
+    */
 
     // Undo the last game move
     pub fn undo(mut self) -> GameResult<Self> {
@@ -289,14 +271,14 @@ impl Game<NormalTurn> {
                 game: self,
                 error: UserError::CannotUndo,
             }),
-            Some(Move {
+            Some(GameMove {
                 action: Action::Capture { .. } | Action::Move,
                 ..
             }) => {
                 self.active_side = !self.active_side;
                 Ok(NextTurn::Continued(self.transition(NormalTurn)))
             }
-            Some(Move {
+            Some(GameMove {
                 action: Action::Promote { .. },
                 ..
             }) => {
@@ -320,8 +302,9 @@ impl Game<PromotePawn> {
             side: self.active_side,
         };
 
-        self.board.pieces.insert(destination, new_piece.clone());
-        self.moves.push(Move {
+        let old_piece = self.board.pieces.insert(destination, new_piece.clone());
+        self.moves.push(GameMove {
+            piece: old_piece.expect("no piece to promote ??"),
             origin: destination,
             destination,
             action: Action::Promote { to: new_piece },
@@ -338,11 +321,11 @@ impl Game<PromotePawn> {
                 game: self,
                 error: UserError::CannotUndo,
             }),
-            Some(Move {
+            Some(GameMove {
                 action: Action::Capture { .. } | Action::Move,
                 ..
             }) => Ok(NextTurn::Continued(self.transition(NormalTurn))),
-            Some(Move {
+            Some(GameMove {
                 action: Action::Promote { .. },
                 ..
             }) => Ok(NextTurn::PromotionRequired(self.transition(PromotePawn))),
@@ -432,7 +415,7 @@ mod tests {
 
         let mut game = new_game(Some(board));
 
-        let is_check = game.king_in_check()?;
+        let is_check = game.king_in_check(Side::White);
         assert!(!is_check, "expected no check here 1");
 
         game.board.pieces.insert(
@@ -443,7 +426,7 @@ mod tests {
             },
         );
 
-        let is_check = game.king_in_check()?;
+        let is_check = game.king_in_check(Side::White);
         assert!(!is_check, "expected no check here 2");
 
         game.board.pieces.insert(
@@ -454,7 +437,7 @@ mod tests {
             },
         );
 
-        let is_check = game.king_in_check()?;
+        let is_check = game.king_in_check(Side::White);
         assert!(is_check, "expected check due to rook here");
 
         Ok(())

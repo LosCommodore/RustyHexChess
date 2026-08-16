@@ -1,186 +1,393 @@
 ---
 source: hexagon_logic/src/board.rs
-assertion_line: 226
 expression: options
 ---
 [
-    MoveOption {
-        pos: Position {
+    GameMove {
+        piece: Piece {
+            piece_type: Pawn,
+            side: Black,
+        },
+        origin: Position {
+            y: 1,
+            x: 10,
+        },
+        destination: Position {
             y: 1,
             x: 9,
         },
         action: Move,
     },
-    MoveOption {
-        pos: Position {
+    GameMove {
+        piece: Piece {
+            piece_type: Pawn,
+            side: Black,
+        },
+        origin: Position {
+            y: 1,
+            x: 10,
+        },
+        destination: Position {
             y: 1,
             x: 9,
         },
         action: Move,
     },
-    MoveOption {
-        pos: Position {
+    GameMove {
+        piece: Piece {
+            piece_type: Pawn,
+            side: Black,
+        },
+        origin: Position {
+            y: 1,
+            x: 9,
+        },
+        destination: Position {
             y: 1,
             x: 8,
         },
         action: Move,
     },
-    MoveOption {
-        pos: Position {
+    GameMove {
+        piece: Piece {
+            piece_type: Pawn,
+            side: Black,
+        },
+        origin: Position {
+            y: 2,
+            x: 9,
+        },
+        destination: Position {
             y: 2,
             x: 8,
         },
         action: Move,
     },
-    MoveOption {
-        pos: Position {
+    GameMove {
+        piece: Piece {
+            piece_type: Pawn,
+            side: Black,
+        },
+        origin: Position {
+            y: 2,
+            x: 9,
+        },
+        destination: Position {
             y: 2,
             x: 8,
         },
         action: Move,
     },
-    MoveOption {
-        pos: Position {
+    GameMove {
+        piece: Piece {
+            piece_type: Pawn,
+            side: Black,
+        },
+        origin: Position {
+            y: 2,
+            x: 8,
+        },
+        destination: Position {
             y: 2,
             x: 7,
         },
         action: Move,
     },
-    MoveOption {
-        pos: Position {
+    GameMove {
+        piece: Piece {
+            piece_type: Pawn,
+            side: Black,
+        },
+        origin: Position {
+            y: 3,
+            x: 8,
+        },
+        destination: Position {
             y: 3,
             x: 7,
         },
         action: Move,
     },
-    MoveOption {
-        pos: Position {
+    GameMove {
+        piece: Piece {
+            piece_type: Pawn,
+            side: Black,
+        },
+        origin: Position {
+            y: 3,
+            x: 8,
+        },
+        destination: Position {
             y: 3,
             x: 7,
         },
         action: Move,
     },
-    MoveOption {
-        pos: Position {
+    GameMove {
+        piece: Piece {
+            piece_type: Pawn,
+            side: Black,
+        },
+        origin: Position {
+            y: 3,
+            x: 7,
+        },
+        destination: Position {
             y: 3,
             x: 6,
         },
         action: Move,
     },
-    MoveOption {
-        pos: Position {
+    GameMove {
+        piece: Piece {
+            piece_type: Pawn,
+            side: Black,
+        },
+        origin: Position {
+            y: 4,
+            x: 7,
+        },
+        destination: Position {
             y: 4,
             x: 6,
         },
         action: Move,
     },
-    MoveOption {
-        pos: Position {
+    GameMove {
+        piece: Piece {
+            piece_type: Pawn,
+            side: Black,
+        },
+        origin: Position {
+            y: 4,
+            x: 7,
+        },
+        destination: Position {
             y: 4,
             x: 6,
         },
         action: Move,
     },
-    MoveOption {
-        pos: Position {
+    GameMove {
+        piece: Piece {
+            piece_type: Pawn,
+            side: Black,
+        },
+        origin: Position {
+            y: 4,
+            x: 6,
+        },
+        destination: Position {
             y: 4,
             x: 5,
         },
         action: Move,
     },
-    MoveOption {
-        pos: Position {
+    GameMove {
+        piece: Piece {
+            piece_type: Pawn,
+            side: Black,
+        },
+        origin: Position {
+            y: 5,
+            x: 6,
+        },
+        destination: Position {
             y: 5,
             x: 5,
         },
         action: Move,
     },
-    MoveOption {
-        pos: Position {
+    GameMove {
+        piece: Piece {
+            piece_type: Pawn,
+            side: Black,
+        },
+        origin: Position {
+            y: 5,
+            x: 6,
+        },
+        destination: Position {
             y: 5,
             x: 5,
         },
         action: Move,
     },
-    MoveOption {
-        pos: Position {
+    GameMove {
+        piece: Piece {
+            piece_type: Pawn,
+            side: Black,
+        },
+        origin: Position {
+            y: 6,
+            x: 6,
+        },
+        destination: Position {
             y: 6,
             x: 5,
         },
         action: Move,
     },
-    MoveOption {
-        pos: Position {
+    GameMove {
+        piece: Piece {
+            piece_type: Pawn,
+            side: Black,
+        },
+        origin: Position {
+            y: 6,
+            x: 6,
+        },
+        destination: Position {
             y: 6,
             x: 5,
         },
         action: Move,
     },
-    MoveOption {
-        pos: Position {
+    GameMove {
+        piece: Piece {
+            piece_type: Pawn,
+            side: Black,
+        },
+        origin: Position {
+            y: 6,
+            x: 5,
+        },
+        destination: Position {
             y: 6,
             x: 4,
         },
         action: Move,
     },
-    MoveOption {
-        pos: Position {
+    GameMove {
+        piece: Piece {
+            piece_type: Pawn,
+            side: Black,
+        },
+        origin: Position {
+            y: 7,
+            x: 6,
+        },
+        destination: Position {
             y: 7,
             x: 5,
         },
         action: Move,
     },
-    MoveOption {
-        pos: Position {
+    GameMove {
+        piece: Piece {
+            piece_type: Pawn,
+            side: Black,
+        },
+        origin: Position {
+            y: 7,
+            x: 6,
+        },
+        destination: Position {
             y: 7,
             x: 5,
         },
         action: Move,
     },
-    MoveOption {
-        pos: Position {
+    GameMove {
+        piece: Piece {
+            piece_type: Pawn,
+            side: Black,
+        },
+        origin: Position {
+            y: 7,
+            x: 5,
+        },
+        destination: Position {
             y: 7,
             x: 4,
         },
         action: Move,
     },
-    MoveOption {
-        pos: Position {
+    GameMove {
+        piece: Piece {
+            piece_type: Pawn,
+            side: Black,
+        },
+        origin: Position {
+            y: 8,
+            x: 6,
+        },
+        destination: Position {
             y: 8,
             x: 5,
         },
         action: Move,
     },
-    MoveOption {
-        pos: Position {
+    GameMove {
+        piece: Piece {
+            piece_type: Pawn,
+            side: Black,
+        },
+        origin: Position {
+            y: 8,
+            x: 6,
+        },
+        destination: Position {
             y: 8,
             x: 5,
         },
         action: Move,
     },
-    MoveOption {
-        pos: Position {
+    GameMove {
+        piece: Piece {
+            piece_type: Pawn,
+            side: Black,
+        },
+        origin: Position {
+            y: 8,
+            x: 5,
+        },
+        destination: Position {
             y: 8,
             x: 4,
         },
         action: Move,
     },
-    MoveOption {
-        pos: Position {
+    GameMove {
+        piece: Piece {
+            piece_type: Pawn,
+            side: Black,
+        },
+        origin: Position {
+            y: 9,
+            x: 6,
+        },
+        destination: Position {
             y: 9,
             x: 5,
         },
         action: Move,
     },
-    MoveOption {
-        pos: Position {
+    GameMove {
+        piece: Piece {
+            piece_type: Pawn,
+            side: Black,
+        },
+        origin: Position {
+            y: 9,
+            x: 6,
+        },
+        destination: Position {
             y: 9,
             x: 5,
         },
         action: Move,
     },
-    MoveOption {
-        pos: Position {
+    GameMove {
+        piece: Piece {
+            piece_type: Pawn,
+            side: Black,
+        },
+        origin: Position {
+            y: 9,
+            x: 5,
+        },
+        destination: Position {
             y: 9,
             x: 4,
         },

@@ -41,7 +41,7 @@ fn main() -> Result<()> {
     };
 
     let mv_options = game.get_movement_options(Position::from_human(('B', 6)).unwrap())?;
-    let markers = mv_options.iter().map(|x| x.pos).collect();
+    let markers = mv_options.iter().map(|x| x.destination).collect();
     terminal.display(game.board(), &markers)?;
 
     let mut output_dir = find_output_directory();

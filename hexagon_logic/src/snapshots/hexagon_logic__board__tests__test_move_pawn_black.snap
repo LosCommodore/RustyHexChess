@@ -1,11 +1,18 @@
 ---
 source: hexagon_logic/src/board.rs
-assertion_line: 213
 expression: options
 ---
 [
-    MoveOption {
-        pos: Position {
+    GameMove {
+        piece: Piece {
+            piece_type: Pawn,
+            side: Black,
+        },
+        origin: Position {
+            y: 5,
+            x: 4,
+        },
+        destination: Position {
             y: 5,
             x: 3,
         },

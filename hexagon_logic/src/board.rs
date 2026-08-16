@@ -43,13 +43,15 @@ type Result<T> = std::result::Result<T, super::MoveError>;
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub enum Action {
     Move,
-    Capture { piece: Piece },
+    Capture { piece: Piece, pos: Position }, // pos for en passant capture
     Promote { to: Piece },
 }
 
-#[derive(Clone, Debug)]
-pub struct MoveOption {
-    pub pos: Position,
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct GameMove {
+    pub piece: Piece,
+    pub origin: Position,
+    pub destination: Position,
     pub action: Action,
 }
 
@@ -68,7 +70,7 @@ pub enum Capability {
 }
 
 impl Board {
-    pub fn get_movement_options(&self, pos: Position) -> Result<Vec<MoveOption>> {
+    pub fn get_movement_options(&self, pos: Position) -> Result<Vec<GameMove>> {
         let me = self
             .pieces
             .get(&pos)
@@ -89,29 +91,32 @@ impl Board {
 
     pub fn is_movement_option(
         &self,
-        pos: &Position,
-        my_side: Side,
+        origin: Position,
+        me: &Piece,
         dy: isize,
         dx: isize,
         capture_mode: Capability,
-    ) -> Option<MoveOption> {
-        let (mut y, mut x) = pos.pos();
+    ) -> Option<GameMove> {
+        let (mut y, mut x) = origin.pos();
 
         y = y.checked_add_signed(dy)?;
         x = x.checked_add_signed(dx)?;
 
-        let pos = Position::new(y, x).ok()?;
-        if let Some(piece) = self.pieces.get(&pos) {
-            if piece.side() == my_side {
+        let destination = Position::new(y, x).ok()?;
+        if let Some(enemy_piece) = self.pieces.get(&destination) {
+            if enemy_piece.side() == me.side {
                 return None;
             } else {
                 match capture_mode {
                     Capability::Move => return None,
                     _ => {
-                        return Some(MoveOption {
-                            pos,
+                        return Some(GameMove {
+                            piece: me.clone(),
+                            origin,
+                            destination,
                             action: Action::Capture {
-                                piece: piece.clone(),
+                                piece: enemy_piece.clone(),
+                                pos: destination,
                             },
                         });
                     }
@@ -121,15 +126,17 @@ impl Board {
 
         match capture_mode {
             Capability::Capture => None,
-            _ => Some(MoveOption {
-                pos,
+            _ => Some(GameMove {
+                piece: me.clone(),
+                origin,
+                destination,
                 action: Action::Move,
             }),
         }
     }
 
     // The pawn is a special case and therefore has its own function
-    fn get_pawn_moves(&self, me: &Piece, pos: Position) -> Vec<MoveOption> {
+    fn get_pawn_moves(&self, me: &Piece, pos: Position) -> Vec<GameMove> {
         let mut options = Vec::new();
         let color = me.side;
         let orientation = if color == Side::White { 1 } else { -1 };
@@ -155,23 +162,18 @@ impl Board {
         };
 
         for (dy, dx) in capture_moves {
-            let option = self.is_movement_option(&pos, me.side, *dy, *dx, Capability::Capture);
+            let option = self.is_movement_option(pos, &me, *dy, *dx, Capability::Capture);
             options.extend(option);
         }
         options
     }
 
     // A step is a direct move to another position, no blocking of movements.
-    fn get_step_moves(
-        &self,
-        me: &Piece,
-        pos: Position,
-        steps: &[(isize, isize)],
-    ) -> Vec<MoveOption> {
+    fn get_step_moves(&self, me: &Piece, pos: Position, steps: &[(isize, isize)]) -> Vec<GameMove> {
         let mut options = Vec::new();
 
         for (dy, dx) in steps {
-            let option = self.is_movement_option(&pos, me.side, *dy, *dx, Capability::Both);
+            let option = self.is_movement_option(pos, &me, *dy, *dx, Capability::Both);
             options.extend(option);
         }
 
@@ -186,10 +188,10 @@ impl Board {
         (dy, dx): (isize, isize),
         nr_steps: Option<usize>,
         capability: Capability,
-    ) -> Vec<MoveOption> {
+    ) -> Vec<GameMove> {
         let mut options = Vec::new();
         for _ in 0..nr_steps.unwrap_or(BOARD_DIM) {
-            let Some(new_move) = self.is_movement_option(&pos, me.side, dy, dx, capability) else {
+            let Some(new_move) = self.is_movement_option(pos, &me, dy, dx, capability) else {
                 return options;
             };
             options.push(new_move.clone());
@@ -197,15 +199,53 @@ impl Board {
                 break;
             }
 
-            pos = new_move.pos;
+            pos = new_move.destination;
         }
         options
     }
 
-    // Moves a piece and removes anything at the destination from the board
-    pub fn move_piece(&mut self, origin: Position, destination: Position) {
-        let piece = self.pieces.remove(&origin).expect("No piece at origin");
-        self.pieces.insert(destination, piece);
+    pub fn execute_game_move(&mut self, game_move: GameMove) {
+        let me = self
+            .pieces
+            .remove(&game_move.origin)
+            .expect("No piece at origin");
+
+        match game_move.action {
+            Action::Move => {
+                self.pieces.insert(game_move.destination, me);
+            }
+            Action::Capture { pos: enemy_pos, .. } => {
+                self.pieces.remove(&enemy_pos);
+                self.pieces.insert(game_move.destination, me);
+            }
+            Action::Promote { to } => {
+                self.pieces.insert(game_move.destination, to);
+            }
+        }
+    }
+
+    pub fn undo_game_move(&mut self, game_move: &GameMove) {
+        let me = self
+            .pieces
+            .remove(&game_move.destination)
+            .expect("No piece at destination");
+
+        match &game_move.action {
+            Action::Move => {
+                self.pieces.insert(game_move.origin, me);
+            }
+            Action::Capture {
+                pos: enemy_pos,
+                piece: taken_piece,
+            } => {
+                self.pieces.insert(*enemy_pos, taken_piece.clone());
+                self.pieces.insert(game_move.origin, me);
+            }
+            Action::Promote { .. } => {
+                self.pieces
+                    .insert(game_move.destination, game_move.piece.clone());
+            }
+        }
     }
 }
 
@@ -242,7 +282,7 @@ mod tests {
             );
         }
 
-        let markers: HashSet<Position> = options.iter().map(|x| x.pos).collect();
+        let markers: HashSet<Position> = options.iter().map(|x| x.destination).collect();
 
         snap_board(&board, &markers, snapshot_name);
         insta::assert_debug_snapshot!(snapshot_name, options);

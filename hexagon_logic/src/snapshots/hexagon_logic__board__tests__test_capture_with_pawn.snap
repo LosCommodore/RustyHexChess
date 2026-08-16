@@ -1,32 +1,63 @@
 ---
 source: hexagon_logic/src/board.rs
-assertion_line: 268
 expression: options
 ---
 [
-    MoveOption {
-        pos: Position {
+    GameMove {
+        piece: Piece {
+            piece_type: Pawn,
+            side: White,
+        },
+        origin: Position {
+            y: 5,
+            x: 4,
+        },
+        destination: Position {
             y: 5,
             x: 5,
         },
         action: Move,
     },
-    MoveOption {
-        pos: Position {
+    GameMove {
+        piece: Piece {
+            piece_type: Pawn,
+            side: White,
+        },
+        origin: Position {
+            y: 5,
+            x: 4,
+        },
+        destination: Position {
             y: 5,
             x: 5,
         },
         action: Move,
     },
-    MoveOption {
-        pos: Position {
+    GameMove {
+        piece: Piece {
+            piece_type: Pawn,
+            side: White,
+        },
+        origin: Position {
+            y: 5,
+            x: 5,
+        },
+        destination: Position {
             y: 5,
             x: 6,
         },
         action: Move,
     },
-    MoveOption {
-        pos: Position {
+    GameMove {
+        piece: Piece {
+            piece_type: Pawn,
+            side: White,
+        },
+        origin: Position {
+            y: 5,
+            x: 4,
+        },
+        destination: Position {
             y: 6,
             x: 4,
         },
@@ -35,10 +66,22 @@ expression: options
                 piece_type: Bishop,
                 side: Black,
             },
+            pos: Position {
+                y: 6,
+                x: 4,
+            },
         },
     },
-    MoveOption {
-        pos: Position {
+    GameMove {
+        piece: Piece {
+            piece_type: Pawn,
+            side: White,
+        },
+        origin: Position {
+            y: 5,
+            x: 4,
+        },
+        destination: Position {
             y: 4,
             x: 5,
         },
@@ -46,6 +89,10 @@ expression: options
             piece: Piece {
                 piece_type: Queen,
                 side: Black,
+            },
+            pos: Position {
+                y: 4,
+                x: 5,
             },
         },
     },
