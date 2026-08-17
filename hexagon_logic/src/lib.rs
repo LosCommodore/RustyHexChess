@@ -79,6 +79,12 @@ pub enum NextTurn {
     GameOver(Game<GameOver>),
 }
 
+pub enum KingState {
+    Nothing,
+    Check,
+    Mate,
+}
+
 pub type GameResult<Game> = std::result::Result<NextTurn, GameError<Game>>;
 pub type Result<T> = std::result::Result<T, UserError>;
 
@@ -196,7 +202,7 @@ impl Game<NormalTurn> {
         };
 
         // -- Normal move logic
-        self.board.execute(game_move.clone());
+        self.board.execute(&game_move);
         self.moves.push(game_move.clone());
 
         // -- Promotion logic
@@ -240,10 +246,9 @@ impl Game<NormalTurn> {
         is_check
     }
 
-    /*
-    pub fn is_check_mate(&mut self) -> bool {
+    pub fn check_king(&mut self) -> KingState {
         if !self.king_in_check(self.active_side) {
-            return false;
+            return KingState::Nothing;
         }
 
         let my_pieces = self.pieces_by_side(self.active_side);
@@ -253,21 +258,17 @@ impl Game<NormalTurn> {
                 .get_movement_options(origin)
                 .expect("A piece must be here");
 
+            for mv in mv_options {
+                self.board.execute(&mv);
 
-            for GameAction { destination, .. } in mv_options {
-                let taken = self.board.execute_action(origin, destination);
                 if !self.king_in_check(self.active_side) {
-                    return false;
+                    return KingState::Check;
                 }
-                self.board.execute_action(destination, origin);
-                if let Some(p) = taken {
-                    self.board.pieces.insert(destination, p);
-                };
+                self.board.undo(&mv);
             }
         }
-        true
+        KingState::Mate
     }
-    */
 
     // Undo the last game move
     pub fn undo(mut self) -> GameResult<Self> {

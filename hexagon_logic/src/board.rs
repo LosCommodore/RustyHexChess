@@ -204,13 +204,13 @@ impl Board {
         options
     }
 
-    pub fn execute(&mut self, game_move: GameMove) {
+    pub fn execute(&mut self, game_move: &GameMove) {
         let me = self
             .pieces
             .remove(&game_move.origin)
             .expect("No piece at origin");
 
-        match game_move.action {
+        match &game_move.action {
             Action::Move => {
                 self.pieces.insert(game_move.destination, me);
             }
@@ -219,7 +219,7 @@ impl Board {
                 self.pieces.insert(game_move.destination, me);
             }
             Action::Promote { to } => {
-                self.pieces.insert(game_move.destination, to);
+                self.pieces.insert(game_move.destination, to.clone());
             }
         }
     }
