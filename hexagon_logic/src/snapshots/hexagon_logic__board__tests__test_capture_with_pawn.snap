@@ -62,7 +62,7 @@ expression: options
             x: 4,
         },
         action: Capture {
-            piece: Piece {
+            enemy: Piece {
                 piece_type: Bishop,
                 side: Black,
             },
@@ -86,7 +86,7 @@ expression: options
             x: 5,
         },
         action: Capture {
-            piece: Piece {
+            enemy: Piece {
                 piece_type: Queen,
                 side: Black,
             },

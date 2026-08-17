@@ -108,6 +108,19 @@ impl<T> Game<T> {
         }
     }
 
+    fn undo_next_turn(self, mv: GameMove) -> NextTurn {
+        match mv {
+            GameMove {
+                action: Action::Capture { .. } | Action::Move,
+                ..
+            } => NextTurn::Continued(self.transition(NormalTurn)),
+            GameMove {
+                action: Action::Promote { .. },
+                ..
+            } => NextTurn::PromotionRequired(self.transition(PromotePawn)),
+        }
+    }
+
     pub fn board(&self) -> &Board {
         &self.board
     }
@@ -123,13 +136,6 @@ impl<T> Game<T> {
             .filter(|(_, piece)| piece.side == side)
             .map(|(&pos, piece)| (pos, piece.clone()))
             .collect()
-    }
-
-    // Helper function: undo the move but not the statemachine of the game
-    fn undo_move(&mut self) -> Option<GameMove> {
-        let game_move = self.moves.pop()?;
-        self.board.undo_game_move(&game_move);
-        Some(game_move)
     }
 }
 
@@ -190,7 +196,7 @@ impl Game<NormalTurn> {
         };
 
         // -- Normal move logic
-        self.board.execute_game_move(game_move.clone());
+        self.board.execute(game_move.clone());
         self.moves.push(game_move.clone());
 
         // -- Promotion logic
@@ -265,27 +271,16 @@ impl Game<NormalTurn> {
 
     // Undo the last game move
     pub fn undo(mut self) -> GameResult<Self> {
-        let mv = self.undo_move();
-        match mv {
-            None => Err(GameError {
+        let Some(mv) = self.moves.pop() else {
+            return Err(GameError {
                 game: self,
                 error: UserError::CannotUndo,
-            }),
-            Some(GameMove {
-                action: Action::Capture { .. } | Action::Move,
-                ..
-            }) => {
-                self.active_side = !self.active_side;
-                Ok(NextTurn::Continued(self.transition(NormalTurn)))
-            }
-            Some(GameMove {
-                action: Action::Promote { .. },
-                ..
-            }) => {
-                self.active_side = !self.active_side;
-                Ok(NextTurn::PromotionRequired(self.transition(PromotePawn)))
-            }
-        }
+            });
+        };
+
+        self.board.undo(&mv);
+        self.active_side = !self.active_side;
+        Ok(self.undo_next_turn(mv))
     }
 }
 
@@ -315,21 +310,14 @@ impl Game<PromotePawn> {
     }
 
     pub fn undo(mut self) -> GameResult<Self> {
-        let mv = self.undo_move();
-        match mv {
-            None => Err(GameError {
+        let Some(mv) = self.moves.pop() else {
+            return Err(GameError {
                 game: self,
                 error: UserError::CannotUndo,
-            }),
-            Some(GameMove {
-                action: Action::Capture { .. } | Action::Move,
-                ..
-            }) => Ok(NextTurn::Continued(self.transition(NormalTurn))),
-            Some(GameMove {
-                action: Action::Promote { .. },
-                ..
-            }) => Ok(NextTurn::PromotionRequired(self.transition(PromotePawn))),
-        }
+            });
+        };
+
+        Ok(self.undo_next_turn(mv))
     }
 }
 

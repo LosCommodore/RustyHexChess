@@ -47,7 +47,7 @@ expression: options
             x: 7,
         },
         action: Capture {
-            piece: Piece {
+            enemy: Piece {
                 piece_type: King,
                 side: Black,
             },

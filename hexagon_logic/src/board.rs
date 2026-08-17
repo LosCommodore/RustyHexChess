@@ -204,7 +204,7 @@ impl Board {
         options
     }
 
-    pub fn execute_game_move(&mut self, game_move: GameMove) {
+    pub fn execute(&mut self, game_move: GameMove) {
         let me = self
             .pieces
             .remove(&game_move.origin)
@@ -224,7 +224,7 @@ impl Board {
         }
     }
 
-    pub fn undo_game_move(&mut self, game_move: &GameMove) {
+    pub fn undo(&mut self, game_move: &GameMove) {
         let me = self
             .pieces
             .remove(&game_move.destination)
