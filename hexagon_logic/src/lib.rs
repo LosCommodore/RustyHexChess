@@ -317,6 +317,7 @@ impl Game<PromotePawn> {
             });
         };
 
+        self.board.undo(&mv);
         Ok(self.undo_next_turn(mv))
     }
 }
