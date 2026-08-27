@@ -34,8 +34,8 @@ pub enum UserError {
 }
 
 #[derive(Debug)]
-pub struct GameError<T> {
-    pub game: T,
+pub struct GameError<G> {
+    pub game: G,
     pub error: UserError,
 }
 
