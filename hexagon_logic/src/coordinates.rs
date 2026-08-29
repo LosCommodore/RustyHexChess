@@ -73,6 +73,10 @@ impl Position {
         let c = num_to_char_notation(self.y).expect("Invalid human notation ???");
         (c, self.x + 1)
     }
+
+    pub fn coordinates(&self) -> (usize, usize) {
+        (self.y, self.x)
+    }
 }
 
 /// Returns true if this position is inside the board boundaries

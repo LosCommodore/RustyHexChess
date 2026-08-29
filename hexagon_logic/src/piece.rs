@@ -87,6 +87,9 @@ impl PieceType {
 }
 
 impl Piece {
+    pub fn new(piece_type: PieceType, side: Side) -> Self {
+        Self { piece_type, side }
+    }
     pub fn piece_type(&self) -> PieceType {
         self.piece_type
     }

@@ -79,6 +79,7 @@ pub enum NextTurn {
     GameOver(Game<GameOver>),
 }
 
+#[derive(PartialEq, Eq, Debug)]
 pub enum KingState {
     Nothing,
     Check,
@@ -230,7 +231,6 @@ impl Game<NormalTurn> {
 
     pub fn king_in_check(&self, kings_side: Side) -> bool {
         let enemy_pieces = self.pieces_by_side(!kings_side);
-
         let Some((&pos_king, _)) = self.board.pieces.iter().find(|(_, piece)| {
             piece.side == self.active_side && piece.piece_type == PieceType::King
         }) else {
@@ -240,7 +240,7 @@ impl Game<NormalTurn> {
         let is_check: bool = enemy_pieces.iter().any(|(&pos, _)| {
             self.get_movement_options(pos)
                 .map(|options| options.iter().any(|x| x.destination == pos_king))
-                .unwrap_or(false)
+                .unwrap()
         });
 
         is_check
@@ -262,6 +262,7 @@ impl Game<NormalTurn> {
                 self.board.execute(&mv);
 
                 if !self.king_in_check(self.active_side) {
+                    self.board.undo(&mv);
                     return KingState::Check;
                 }
                 self.board.undo(&mv);
@@ -516,5 +517,49 @@ mod tests {
             assert_eq!(new_state, game_state, "game state not identical");
         }
         Ok(())
+    }
+
+    #[test]
+    fn test_check_mate() {
+        use PieceType::*;
+        use Side::*;
+        let human = Position::from_human;
+
+        let board = Board::default();
+        let mut game = new_game(Some(board));
+
+        game.board
+            .pieces
+            .insert(human(('F', 5)).unwrap(), Piece::new(King, White));
+
+        assert_eq!(game.check_king(), KingState::Nothing);
+
+        game.board
+            .pieces
+            .insert(human(('F', 1)).unwrap(), Piece::new(Rook, Black));
+
+        assert_eq!(game.check_king(), KingState::Check);
+
+        game.board
+            .pieces
+            .insert(human(('E', 2)).unwrap(), Piece::new(Rook, Black));
+
+        assert_eq!(game.check_king(), KingState::Check);
+
+        let rook3_pos = human(('G', 1)).unwrap();
+        game.board.pieces.insert(rook3_pos, Piece::new(Rook, Black));
+        let _opts: Vec<_> = game
+            .get_movement_options(rook3_pos)
+            .unwrap()
+            .iter()
+            .map(|x| x.destination)
+            .collect();
+
+        for o in &_opts {
+            let (y, x) = o.coordinates();
+            println!("{y}, {x}",);
+        }
+
+        assert_eq!(game.check_king(), KingState::Mate);
     }
 }
