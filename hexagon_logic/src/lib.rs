@@ -11,7 +11,7 @@ use crate::{
     coordinates::{HumanNotation, Position},
     piece::{
         BLACK_PAWNS_PROMOTION_POSITIONS, Piece, PieceType, WHITE_PAWNS_PROMOTION_POSITIONS,
-        get_startup_pieces_black, get_startup_pieces_white,
+        get_startup_pieces_black, get_startup_pieces_white, pawn_starting_positions,
     },
 };
 use serde::Serialize;
@@ -147,6 +147,41 @@ impl<T> Game<T> {
 }
 
 impl Game<NormalTurn> {
+    pub fn get_movement_options(&self, pos: Position) -> Result<Vec<GameMove>> {
+        let mv = self.board.get_movement_options(pos)?;
+
+        let Some(last) = self.moves.last() else {
+            return Ok(mv);
+        };
+
+        let starting_pos = pawn_starting_positions(!self.active_side);
+
+        if last.piece.piece_type != PieceType::Pawn && starting_pos.contains(&last.origin) {
+            return Ok(mv);
+        }
+
+        let dx = last.destination.coordinates().1 as isize - last.origin.coordinates().1 as isize;
+
+        if dx.abs() < 2 {
+            return Ok(mv);
+        }
+
+        let x = (last.origin.pos().1 as isize + dx.signum()) as usize;
+
+        let _virtual_pos = Position::new(last.origin.pos().0, x);
+
+        let _my_pawns: Vec<_> = self
+            .pieces_by_side(self.active_side)
+            .iter()
+            .filter(|(pos, piece)| {
+                piece.piece_type == PieceType::Pawn
+                    && pawn_starting_positions(self.active_side).contains(pos)
+            })
+            .collect();
+
+        Ok(mv)
+    }
+
     // Make a move using human coordinates
     pub fn make_human_move(
         self,
@@ -184,7 +219,7 @@ impl Game<NormalTurn> {
             return Err(UserError::WrongPlayer);
         }
 
-        let options = self.board.get_movement_options(origin)?;
+        let options = self.get_movement_options(origin)?;
 
         let option = options
             .iter()
@@ -222,11 +257,6 @@ impl Game<NormalTurn> {
         // -- Next turn
         self.next_turn();
         Ok(NextTurn::Continued(self))
-    }
-
-    pub fn get_movement_options(&self, pos: Position) -> Result<Vec<GameMove>> {
-        self.board.get_movement_options(pos).map_err(|e| e.into())
-        // todo -> add en passant
     }
 
     pub fn king_in_check(&self, kings_side: Side) -> bool {

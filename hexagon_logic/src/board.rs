@@ -6,11 +6,11 @@ use thiserror::Error;
 use super::piece::Piece;
 use std::collections::BTreeMap;
 
+use crate::piece::pawn_starting_positions;
 use crate::{
     Side,
     coordinates::{BOARD_DIM, Position},
     movement::{MovementPattern, get_movement_patterns},
-    piece::{BLACK_PAWNS_STARTING_POSITIONS, WHITE_PAWNS_STARTING_POSITIONS},
 };
 
 #[non_exhaustive]
@@ -146,10 +146,7 @@ impl Board {
         options.extend(self.get_step_moves(me, pos, &[direction]));
 
         // --- walk two steps from starting position
-        let starting_positions = match color {
-            Side::White => WHITE_PAWNS_STARTING_POSITIONS,
-            Side::Black => BLACK_PAWNS_STARTING_POSITIONS,
-        };
+        let starting_positions = pawn_starting_positions(color);
 
         if starting_positions.contains(&pos) {
             options.extend(self.get_walk_moves(me, pos, direction, Some(2), Capability::Move));
@@ -255,7 +252,7 @@ impl Board {
 mod tests {
     use super::*;
     use crate::display::save_board_to_html_file;
-    use crate::piece::PieceType;
+    use crate::piece::{BLACK_PAWNS_STARTING_POSITIONS, PieceType, WHITE_PAWNS_STARTING_POSITIONS};
     use std::collections::HashSet;
     use std::path::PathBuf;
     use strum::IntoEnumIterator;

@@ -10,6 +10,7 @@
     "crossterm",
     "insta",
     "msvc",
+    "signum",
     "statemachine",
     "statesimpl",
     "statespub",

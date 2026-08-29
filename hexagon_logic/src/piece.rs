@@ -73,6 +73,13 @@ pub enum PieceType {
     Pawn,
 }
 
+pub const fn pawn_starting_positions(side: Side) -> [Position; 9] {
+    match side {
+        Side::White => WHITE_PAWNS_STARTING_POSITIONS,
+        Side::Black => BLACK_PAWNS_STARTING_POSITIONS,
+    }
+}
+
 impl PieceType {
     pub fn symbol(self) -> char {
         match self {
