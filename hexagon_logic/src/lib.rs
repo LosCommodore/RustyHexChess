@@ -548,6 +548,15 @@ mod tests {
 
         let rook3_pos = human(('G', 1)).unwrap();
         game.board.pieces.insert(rook3_pos, Piece::new(Rook, Black));
+
+        game.board
+            .pieces
+            .insert(human(('D', 3)).unwrap(), Piece::new(Rook, Black));
+
+        game.board
+            .pieces
+            .insert(human(('H', 1)).unwrap(), Piece::new(Rook, Black));
+
         let _opts: Vec<_> = game
             .get_movement_options(rook3_pos)
             .unwrap()
