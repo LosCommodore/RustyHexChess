@@ -8,20 +8,18 @@
 
 As a first step the game will be rendered in the terminal. It is easier to display rotated 90 degrees:
 
-![terminal image](./doc/terminal.png)
 
-```text
-                          1    2    3    4    5    6
-                         /    /    /    /    /    /    7
-                    A  [ . ][ . ][ . ][ . ][ . ][ . ] /  8
-                 B  [ P ][ . ][ . ][ . ][ . ][ . ][ P ] /  9
-              C  [ R ][ P ][ . ][ . ][ . ][ . ][ P ][ R ] /  10
-           D  [ N ][ . ][ P ][ . ][ . ][ . ][ P ][ . ][ N ] /  11
-        E  [ K ][ . ][ . ][ P ][ . ][ . ][ P ][ . ][ . ][ K ] /
-     F  [ B ][ B ][ B ][ . ][ P ][ . ][ P ][ . ][ B ][ B ][ B ]
-        G  [ Q ][ . ][ . ][ P ][ . ][ . ][ P ][ . ][ . ][ Q ]
-           H  [ N ][ . ][ P ][ . ][ . ][ . ][ P ][ . ][ N ]
-              I  [ R ][ P ][ . ][ . ][ . ][ . ][ P ][ R ]
-                 K  [ P ][ . ][ . ][ . ][ . ][ . ][ P ]
-                    L  [ . ][ . ][ . ][ . ][ . ][ . ]
-```
+<pre style="font-family: monospace; white-space: pre; line-height: 1.2; background-color: #000; color: #fff; padding: 10px;">                    A  [ . ][ . ][ . ][ . ]<span style='background:var(--yellow,#a60)'>[ . ]</span>[ . ]
+                 B  <span style='background:var(--yellow,#a60)'>[ . ]</span>[ . ]<span style='background:var(--yellow,#a60)'>[ . ]</span>[ . ]<span style='background:var(--yellow,#a60)'>[ . ]</span>[ . ][ . ]
+              C  [ . ]<span style='background:var(--yellow,#a60)'>[ . ]</span>[ . ][ . ]<span style='background:var(--yellow,#a60)'>[ . ]</span>[ . ][ . ]<span style='background:var(--yellow,#a60)'>[ . ]</span>
+           D  <span style='background:var(--yellow,#a60)'>[ . ]</span>[ . ]<span style='background:var(--yellow,#a60)'>[ . ][ . ][ . ]</span>[ . ]<span style='background:var(--yellow,#a60)'>[ . ]</span>[ . ][ . ]
+        E  [ . ][ . ]<span style='background:var(--yellow,#a60)'>[ . ][ . ][ . ][ . ]</span>[ . ][ . ][ . ][ . ]
+     F  <span style='background:var(--yellow,#a60)'>[ . ][ . ][ . ][ . ]</span><span style='color:var(--bright-red,#f55)'>[ Q ]</span><span style='background:var(--yellow,#a60)'>[ . ][ . ]</span><span style='background:var(--yellow,#a60)'><span style='color:var(--bright-blue,#55f)'>[ K ]</span></span>[ . ][ . ][ . ]
+        G  [ . ][ . ]<span style='background:var(--yellow,#a60)'>[ . ][ . ][ . ][ . ]</span>[ . ][ . ][ . ][ . ] \
+           H  <span style='background:var(--yellow,#a60)'>[ . ]</span>[ . ]<span style='background:var(--yellow,#a60)'>[ . ][ . ][ . ]</span>[ . ]<span style='background:var(--yellow,#a60)'>[ . ]</span>[ . ][ . ] \  11
+              I  [ . ]<span style='background:var(--yellow,#a60)'>[ . ]</span>[ . ][ . ]<span style='background:var(--yellow,#a60)'>[ . ]</span>[ . ][ . ]<span style='color:var(--bright-red,#f55)'>[ K ]</span> \  10
+                 J  <span style='background:var(--yellow,#a60)'>[ . ]</span>[ . ]<span style='background:var(--yellow,#a60)'>[ . ]</span>[ . ]<span style='background:var(--yellow,#a60)'>[ . ]</span>[ . ][ . ] \  9
+                    K  [ . ][ . ][ . ][ . ]<span style='background:var(--yellow,#a60)'>[ . ]</span>[ . ] \  8
+                         \    \    \    \    \    \   7
+                         1    2    3    4    5    6  
+</pre>
