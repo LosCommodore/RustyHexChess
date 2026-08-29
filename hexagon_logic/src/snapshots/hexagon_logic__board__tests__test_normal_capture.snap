@@ -25,7 +25,7 @@ expression: options
         },
         origin: Position {
             y: 5,
-            x: 5,
+            x: 4,
         },
         destination: Position {
             y: 5,
@@ -40,7 +40,7 @@ expression: options
         },
         origin: Position {
             y: 5,
-            x: 6,
+            x: 4,
         },
         destination: Position {
             y: 5,
@@ -79,7 +79,7 @@ expression: options
         },
         origin: Position {
             y: 5,
-            x: 3,
+            x: 4,
         },
         destination: Position {
             y: 5,
@@ -94,7 +94,7 @@ expression: options
         },
         origin: Position {
             y: 5,
-            x: 2,
+            x: 4,
         },
         destination: Position {
             y: 5,
@@ -109,7 +109,7 @@ expression: options
         },
         origin: Position {
             y: 5,
-            x: 1,
+            x: 4,
         },
         destination: Position {
             y: 5,
@@ -138,8 +138,8 @@ expression: options
             side: White,
         },
         origin: Position {
-            y: 4,
-            x: 5,
+            y: 5,
+            x: 4,
         },
         destination: Position {
             y: 3,
@@ -153,8 +153,8 @@ expression: options
             side: White,
         },
         origin: Position {
-            y: 3,
-            x: 6,
+            y: 5,
+            x: 4,
         },
         destination: Position {
             y: 2,
@@ -168,8 +168,8 @@ expression: options
             side: White,
         },
         origin: Position {
-            y: 2,
-            x: 7,
+            y: 5,
+            x: 4,
         },
         destination: Position {
             y: 1,
@@ -183,8 +183,8 @@ expression: options
             side: White,
         },
         origin: Position {
-            y: 1,
-            x: 8,
+            y: 5,
+            x: 4,
         },
         destination: Position {
             y: 0,
@@ -213,8 +213,8 @@ expression: options
             side: White,
         },
         origin: Position {
-            y: 6,
-            x: 3,
+            y: 5,
+            x: 4,
         },
         destination: Position {
             y: 7,
@@ -228,8 +228,8 @@ expression: options
             side: White,
         },
         origin: Position {
-            y: 7,
-            x: 2,
+            y: 5,
+            x: 4,
         },
         destination: Position {
             y: 8,
@@ -243,8 +243,8 @@ expression: options
             side: White,
         },
         origin: Position {
-            y: 8,
-            x: 1,
+            y: 5,
+            x: 4,
         },
         destination: Position {
             y: 9,
@@ -273,7 +273,7 @@ expression: options
             side: White,
         },
         origin: Position {
-            y: 6,
+            y: 5,
             x: 4,
         },
         destination: Position {
@@ -288,7 +288,7 @@ expression: options
             side: White,
         },
         origin: Position {
-            y: 7,
+            y: 5,
             x: 4,
         },
         destination: Position {
@@ -303,7 +303,7 @@ expression: options
             side: White,
         },
         origin: Position {
-            y: 8,
+            y: 5,
             x: 4,
         },
         destination: Position {
@@ -318,7 +318,7 @@ expression: options
             side: White,
         },
         origin: Position {
-            y: 9,
+            y: 5,
             x: 4,
         },
         destination: Position {
@@ -348,7 +348,7 @@ expression: options
             side: White,
         },
         origin: Position {
-            y: 4,
+            y: 5,
             x: 4,
         },
         destination: Position {
@@ -363,7 +363,7 @@ expression: options
             side: White,
         },
         origin: Position {
-            y: 3,
+            y: 5,
             x: 4,
         },
         destination: Position {
@@ -378,7 +378,7 @@ expression: options
             side: White,
         },
         origin: Position {
-            y: 2,
+            y: 5,
             x: 4,
         },
         destination: Position {
@@ -408,8 +408,8 @@ expression: options
             side: White,
         },
         origin: Position {
-            y: 6,
-            x: 5,
+            y: 5,
+            x: 4,
         },
         destination: Position {
             y: 7,
@@ -438,8 +438,8 @@ expression: options
             side: White,
         },
         origin: Position {
-            y: 4,
-            x: 3,
+            y: 5,
+            x: 4,
         },
         destination: Position {
             y: 3,
@@ -468,8 +468,8 @@ expression: options
             side: White,
         },
         origin: Position {
-            y: 4,
-            x: 6,
+            y: 5,
+            x: 4,
         },
         destination: Position {
             y: 3,
@@ -483,8 +483,8 @@ expression: options
             side: White,
         },
         origin: Position {
-            y: 3,
-            x: 8,
+            y: 5,
+            x: 4,
         },
         destination: Position {
             y: 2,
@@ -513,8 +513,8 @@ expression: options
             side: White,
         },
         origin: Position {
-            y: 6,
-            x: 2,
+            y: 5,
+            x: 4,
         },
         destination: Position {
             y: 7,
@@ -543,8 +543,8 @@ expression: options
             side: White,
         },
         origin: Position {
-            y: 7,
-            x: 3,
+            y: 5,
+            x: 4,
         },
         destination: Position {
             y: 9,
@@ -573,8 +573,8 @@ expression: options
             side: White,
         },
         origin: Position {
-            y: 3,
-            x: 5,
+            y: 5,
+            x: 4,
         },
         destination: Position {
             y: 1,

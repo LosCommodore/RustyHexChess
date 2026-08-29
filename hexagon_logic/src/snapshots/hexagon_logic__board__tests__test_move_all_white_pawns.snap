@@ -40,7 +40,7 @@ expression: options
         },
         origin: Position {
             y: 1,
-            x: 5,
+            x: 4,
         },
         destination: Position {
             y: 1,
@@ -85,7 +85,7 @@ expression: options
         },
         origin: Position {
             y: 2,
-            x: 5,
+            x: 4,
         },
         destination: Position {
             y: 2,
@@ -130,7 +130,7 @@ expression: options
         },
         origin: Position {
             y: 3,
-            x: 5,
+            x: 4,
         },
         destination: Position {
             y: 3,
@@ -175,7 +175,7 @@ expression: options
         },
         origin: Position {
             y: 4,
-            x: 5,
+            x: 4,
         },
         destination: Position {
             y: 4,
@@ -220,7 +220,7 @@ expression: options
         },
         origin: Position {
             y: 5,
-            x: 5,
+            x: 4,
         },
         destination: Position {
             y: 5,
@@ -265,7 +265,7 @@ expression: options
         },
         origin: Position {
             y: 6,
-            x: 4,
+            x: 3,
         },
         destination: Position {
             y: 6,
@@ -310,7 +310,7 @@ expression: options
         },
         origin: Position {
             y: 7,
-            x: 3,
+            x: 2,
         },
         destination: Position {
             y: 7,
@@ -355,7 +355,7 @@ expression: options
         },
         origin: Position {
             y: 8,
-            x: 2,
+            x: 1,
         },
         destination: Position {
             y: 8,
@@ -400,7 +400,7 @@ expression: options
         },
         origin: Position {
             y: 9,
-            x: 1,
+            x: 0,
         },
         destination: Position {
             y: 9,

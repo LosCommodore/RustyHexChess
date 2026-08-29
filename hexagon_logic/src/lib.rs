@@ -553,22 +553,18 @@ mod tests {
             .pieces
             .insert(human(('D', 3)).unwrap(), Piece::new(Rook, Black));
 
+        assert_eq!(game.check_king(), KingState::Check);
+
         game.board
             .pieces
             .insert(human(('H', 1)).unwrap(), Piece::new(Rook, Black));
 
-        let _opts: Vec<_> = game
-            .get_movement_options(rook3_pos)
-            .unwrap()
-            .iter()
-            .map(|x| x.destination)
-            .collect();
-
-        for o in &_opts {
-            let (y, x) = o.coordinates();
-            println!("{y}, {x}",);
-        }
-
         assert_eq!(game.check_king(), KingState::Mate);
+
+        game.board
+            .pieces
+            .insert(human(('K', 3)).unwrap(), Piece::new(Queen, White));
+
+        assert_eq!(game.check_king(), KingState::Check);
     }
 }

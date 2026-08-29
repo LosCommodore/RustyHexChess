@@ -184,16 +184,18 @@ impl Board {
     fn get_walk_moves(
         &self,
         me: &Piece,
-        mut pos: Position,
+        origin: Position,
         (dy, dx): (isize, isize),
         nr_steps: Option<usize>,
         capability: Capability,
     ) -> Vec<GameMove> {
+        let mut pos = origin;
         let mut options = Vec::new();
         for _ in 0..nr_steps.unwrap_or(BOARD_DIM) {
-            let Some(new_move) = self.is_movement_option(pos, &me, dy, dx, capability) else {
+            let Some(mut new_move) = self.is_movement_option(pos, &me, dy, dx, capability) else {
                 return options;
             };
+            new_move.origin = origin;
             options.push(new_move.clone());
             if let Action::Capture { .. } = new_move.action {
                 break;

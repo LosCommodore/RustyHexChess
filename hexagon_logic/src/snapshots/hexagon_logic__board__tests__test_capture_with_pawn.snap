@@ -40,7 +40,7 @@ expression: options
         },
         origin: Position {
             y: 5,
-            x: 5,
+            x: 4,
         },
         destination: Position {
             y: 5,
