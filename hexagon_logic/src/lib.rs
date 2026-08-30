@@ -402,8 +402,40 @@ impl Not for Side {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::display::save_board_to_html_file;
     use anyhow::{Result, bail};
     use core::panic;
+    use std::{collections::HashSet, path::PathBuf};
+
+    fn get_html_repr_path(snapshot_name: &str) -> PathBuf {
+        let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        path.push("src");
+        path.push("snapshots");
+        path.push(format!("{snapshot_name}.html"));
+        path
+    }
+
+    fn snap_board(board: &Board, markers: &HashSet<Position>, snapshot_name: &str) {
+        let path = get_html_repr_path(snapshot_name);
+        save_board_to_html_file(board, markers, path).expect("html could not be generated");
+    }
+
+    fn mark_and_snap<G>(game: &mut Game<G>, positions: &[Position], snapshot_name: &str) {
+        let mut options = Vec::new();
+
+        for p in positions {
+            options.extend(
+                game.board
+                    .get_movement_options(p.clone())
+                    .expect("error on movement options"),
+            );
+        }
+
+        let markers: HashSet<Position> = options.iter().map(|x| x.destination).collect();
+
+        snap_board(&game.board, &markers, snapshot_name);
+        insta::assert_debug_snapshot!(snapshot_name, options);
+    }
 
     #[test]
     fn test_promote_pawn() {
@@ -630,5 +662,45 @@ mod tests {
             .insert(human(('K', 3)).unwrap(), Piece::new(Queen, White));
 
         assert_eq!(game.check_king(), KingState::Check);
+    }
+
+    #[test]
+    fn test_en_passant() {
+        use PieceType::*;
+        use Side::*;
+        let human = Position::from_human;
+
+        let board = Board::default();
+        let mut game = new_game(Some(board));
+        let white_pawn_origin = human(('J', 1)).unwrap();
+        let white_pawn_destination = human(('J', 3)).unwrap();
+        let black_pawn_origin = human(('I', 3)).unwrap();
+
+        game.board
+            .pieces
+            .insert(human(('F', 5)).unwrap(), Piece::new(King, White));
+
+        game.board
+            .pieces
+            .insert(human(('I', 2)).unwrap(), Piece::new(King, Black));
+
+        game.board
+            .pieces
+            .insert(white_pawn_origin, Piece::new(Pawn, White));
+
+        game.board
+            .pieces
+            .insert(black_pawn_origin, Piece::new(Pawn, Black));
+
+        let Ok(NextTurn::Continued(mut game)) =
+            game.make_move(white_pawn_origin, white_pawn_destination)
+        else {
+            panic!("invalid game state")
+        };
+
+        mark_and_snap(&mut game, &[black_pawn_origin], "test_en_passant");
+
+        let options = game.get_movement_options(black_pawn_origin).unwrap();
+        println!("{options:#?}")
     }
 }
