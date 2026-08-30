@@ -12,7 +12,7 @@ use crate::{
     movement::pawn_capture_moves,
     piece::{
         BLACK_PAWNS_PROMOTION_POSITIONS, Piece, PieceType, WHITE_PAWNS_PROMOTION_POSITIONS,
-        get_startup_pieces_black, get_startup_pieces_white, pawn_starting_positions,
+        get_startup_pieces_black, get_startup_pieces_white,
     },
 };
 use serde::Serialize;
@@ -151,9 +151,8 @@ impl Game<NormalTurn> {
     fn get_en_passant_moves(&self) -> Option<Vec<GameMove>> {
         // -- check if last move enables a potential en passant
         let last = self.moves.last()?;
-        let starting_pos = pawn_starting_positions(!self.active_side);
 
-        if last.piece.piece_type != PieceType::Pawn && starting_pos.contains(&last.origin) {
+        if last.piece.piece_type != PieceType::Pawn {
             return None;
         }
 
@@ -166,14 +165,11 @@ impl Game<NormalTurn> {
         let x = (last.origin.pos().1 as isize + dx.signum()) as usize;
         let en_passant_pos = Position::new(last.origin.pos().0, x).expect("Invalid position ???");
 
-        // -- find all own pawns at starting position
+        // -- find all own pawns
         let starter_pawns: Vec<_> = self
             .pieces_by_side(self.active_side)
             .into_iter()
-            .filter(|(pos, piece)| {
-                piece.piece_type == PieceType::Pawn
-                    && pawn_starting_positions(self.active_side).contains(pos)
-            })
+            .filter(|(_, piece)| piece.piece_type == PieceType::Pawn)
             .collect();
 
         // -- Iterate over these pawns and find possible en passant moves
@@ -182,9 +178,15 @@ impl Game<NormalTurn> {
         for (pos, pawn) in &starter_pawns {
             for (dy, dx) in capture_moves {
                 let (y, x) = pos.coordinates();
-                let y = y.checked_add_signed(*dy).expect("Invalid position ???");
-                let x = x.checked_add_signed(*dx).expect("Invalid position ???");
-                let destination = Position::new(y, x).expect("Invalid position ???");
+                let y = y.checked_add_signed(*dy);
+                let x = x.checked_add_signed(*dx);
+
+                let (Some(y), Some(x)) = (y, x) else {
+                    continue;
+                };
+                let Ok(destination) = Position::new(y, x) else {
+                    continue;
+                };
 
                 if destination == en_passant_pos {
                     let new_move = GameMove {
