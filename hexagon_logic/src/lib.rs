@@ -9,6 +9,7 @@ use std::{collections::HashMap, ops::Not};
 use crate::{
     board::{Action, Board, GameMove, MoveError},
     coordinates::{HumanNotation, Position},
+    movement::pawn_capture_moves,
     piece::{
         BLACK_PAWNS_PROMOTION_POSITIONS, Piece, PieceType, WHITE_PAWNS_PROMOTION_POSITIONS,
         get_startup_pieces_black, get_startup_pieces_white, pawn_starting_positions,
@@ -147,38 +148,69 @@ impl<T> Game<T> {
 }
 
 impl Game<NormalTurn> {
-    pub fn get_movement_options(&self, pos: Position) -> Result<Vec<GameMove>> {
-        let mv = self.board.get_movement_options(pos)?;
-
-        let Some(last) = self.moves.last() else {
-            return Ok(mv);
-        };
-
+    fn get_en_passant_moves(&self) -> Option<Vec<GameMove>> {
+        // -- check if last move enables a potential en passant
+        let last = self.moves.last()?;
         let starting_pos = pawn_starting_positions(!self.active_side);
 
         if last.piece.piece_type != PieceType::Pawn && starting_pos.contains(&last.origin) {
-            return Ok(mv);
+            return None;
         }
 
         let dx = last.destination.coordinates().1 as isize - last.origin.coordinates().1 as isize;
-
         if dx.abs() < 2 {
-            return Ok(mv);
+            return None;
         }
 
+        // -- calculate the destination of en-passant
         let x = (last.origin.pos().1 as isize + dx.signum()) as usize;
+        let en_passant_pos = Position::new(last.origin.pos().0, x).expect("Invalid position ???");
 
-        let _virtual_pos = Position::new(last.origin.pos().0, x);
-
-        let _my_pawns: Vec<_> = self
+        // -- find all own pawns at starting position
+        let starter_pawns: Vec<_> = self
             .pieces_by_side(self.active_side)
-            .iter()
+            .into_iter()
             .filter(|(pos, piece)| {
                 piece.piece_type == PieceType::Pawn
                     && pawn_starting_positions(self.active_side).contains(pos)
             })
             .collect();
 
+        // -- Iterate over these pawns and find possible en passant moves
+        let capture_moves = pawn_capture_moves(self.active_side);
+        let mut moves = Vec::new();
+        for (pos, pawn) in &starter_pawns {
+            for (dy, dx) in capture_moves {
+                let (y, x) = pos.coordinates();
+                let y = y.checked_add_signed(*dy).expect("Invalid position ???");
+                let x = x.checked_add_signed(*dx).expect("Invalid position ???");
+                let destination = Position::new(y, x).expect("Invalid position ???");
+
+                if destination == en_passant_pos {
+                    let new_move = GameMove {
+                        piece: pawn.clone(),
+                        origin: *pos,
+                        destination,
+                        action: Action::Capture {
+                            enemy: last.piece.clone(),
+                            pos: last.destination,
+                        },
+                    };
+
+                    moves.push(new_move);
+                }
+            }
+        }
+
+        Some(moves)
+    }
+
+    pub fn get_movement_options(&self, pos: Position) -> Result<Vec<GameMove>> {
+        let mut mv = self.board.get_movement_options(pos)?;
+        let en_passant_mv = self.get_en_passant_moves();
+        if let Some(moves) = en_passant_mv {
+            mv.extend(moves)
+        };
         Ok(mv)
     }
 

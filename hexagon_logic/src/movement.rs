@@ -1,6 +1,6 @@
 #![allow(unused)]
 
-use crate::piece::PieceType;
+use crate::{Side, piece::PieceType};
 type Offset = (isize, isize);
 
 // Name of Directions like in the pictures from:  doc/coordinates.drawio (first picture)
@@ -172,5 +172,12 @@ pub fn get_movement_patterns(piece_type: PieceType) -> &'static [MovementPattern
         Bishop => BISHOP_MOVEMENTS,
         Pawn => &[MovementPattern::Pawn],
         Knight => KNIGHT_MOVEMENTS,
+    }
+}
+
+pub const fn pawn_capture_moves(color: Side) -> &'static [(isize, isize); 2] {
+    match color {
+        Side::White => &[(1, 0), (-1, 1)],
+        Side::Black => &[(-1, 0), (1, -1)],
     }
 }

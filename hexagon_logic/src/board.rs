@@ -6,6 +6,7 @@ use thiserror::Error;
 use super::piece::Piece;
 use std::collections::BTreeMap;
 
+use crate::movement::pawn_capture_moves;
 use crate::piece::pawn_starting_positions;
 use crate::{
     Side,
@@ -153,10 +154,7 @@ impl Board {
         }
 
         // --- capture diagonally
-        let capture_moves = match color {
-            Side::White => &[(1, 0), (-1, 1)],
-            Side::Black => &[(-1, 0), (1, -1)],
-        };
+        let capture_moves = pawn_capture_moves(color);
 
         for (dy, dx) in capture_moves {
             let option = self.is_movement_option(pos, &me, *dy, *dx, Capability::Capture);
