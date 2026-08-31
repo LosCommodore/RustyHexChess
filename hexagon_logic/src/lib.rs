@@ -678,9 +678,16 @@ mod tests {
 
         game.board
             .pieces
-            .insert(human(('H', 1)).unwrap(), Piece::new(Rook, Black));
+            .insert(human(('I', 1)).unwrap(), Piece::new(Rook, Black));
 
-        assert_eq!(game.check_king(), KingState::Mate);
+        game.active_side = Side::Black;
+        let mut game = match game
+            .make_human_move(('I', 1), ('H', 1))
+            .expect("move error ?")
+        {
+            NextTurn::GameOver(game) => game,
+            _ => panic!("should be game over"),
+        };
 
         game.board
             .pieces
