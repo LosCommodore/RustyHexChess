@@ -420,13 +420,12 @@ mod tests {
         save_board_to_html_file(board, markers, path).expect("html could not be generated");
     }
 
-    fn mark_and_snap<G>(game: &mut Game<G>, positions: &[Position], snapshot_name: &str) {
+    fn mark_and_snap(game: &mut Game<NormalTurn>, positions: &[Position], snapshot_name: &str) {
         let mut options = Vec::new();
 
         for p in positions {
             options.extend(
-                game.board
-                    .get_movement_options(p.clone())
+                game.get_movement_options(p.clone())
                     .expect("error on movement options"),
             );
         }
@@ -700,7 +699,16 @@ mod tests {
 
         mark_and_snap(&mut game, &[black_pawn_origin], "test_en_passant");
 
-        let options = game.get_movement_options(black_pawn_origin).unwrap();
-        println!("{options:#?}")
+        let Ok(NextTurn::Continued(mut game)) =
+            game.make_move(black_pawn_origin, human(('j', 2)).unwrap())
+        else {
+            panic!("invalid game state")
+        };
+        mark_and_snap(&mut game, &[], "test_en_passant_2");
+
+        let Ok(NextTurn::Continued(mut game)) = game.undo() else {
+            panic!("invalid game state")
+        };
+        mark_and_snap(&mut game, &[], "test_en_passant_3");
     }
 }
