@@ -26,10 +26,10 @@
 import { ref, computed } from 'vue';
 
 const HEX_RADIUS = 40;
-const SVG_WIDTH = 1200;
-const SVG_HEIGHT = 1200;
-const CENTER_X = 600;
-const CENTER_Y = 600;
+const SVG_WIDTH = 800;
+const SVG_HEIGHT = 900;
+const CENTER_X = 400;
+const CENTER_Y = 450;
 
 interface HexCoord {
   q: number;
