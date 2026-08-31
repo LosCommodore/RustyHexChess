@@ -68,7 +68,9 @@ pub struct Game<T> {
 pub struct NormalTurn;
 
 #[derive(Debug, Serialize)]
-pub struct GameOver;
+pub struct GameOver {
+    winner: Side,
+}
 
 #[derive(Debug, Serialize)]
 pub struct PromotePawn;
@@ -83,7 +85,7 @@ pub enum NextTurn {
 #[derive(PartialEq, Eq, Debug)]
 pub enum KingState {
     Nothing,
-    Check,
+    Check { allowed_moves: Vec<GameMove> },
     Mate,
 }
 
@@ -133,10 +135,6 @@ impl<T> Game<T> {
         &self.board
     }
 
-    fn next_turn(&mut self) {
-        self.active_side = !self.active_side;
-    }
-
     pub fn pieces_by_side(&self, side: Side) -> HashMap<Position, Piece> {
         self.board
             .pieces
@@ -145,9 +143,58 @@ impl<T> Game<T> {
             .map(|(&pos, piece)| (pos, piece.clone()))
             .collect()
     }
-}
 
-impl Game<NormalTurn> {
+    pub fn king_in_check(&self, kings_side: Side) -> bool {
+        let enemy_pieces = self.pieces_by_side(!kings_side);
+        let Some((&pos_king, _)) = self.board.pieces.iter().find(|(_, piece)| {
+            piece.side == self.active_side && piece.piece_type == PieceType::King
+        }) else {
+            panic!("King is missing on board")
+        };
+
+        let is_check: bool = enemy_pieces.iter().any(|(&pos, _)| {
+            self.get_movement_options(pos)
+                .map(|options| options.iter().any(|x| x.destination == pos_king))
+                .unwrap()
+        });
+
+        is_check
+    }
+
+    pub fn check_king(&mut self) -> KingState {
+        if !self.king_in_check(self.active_side) {
+            return KingState::Nothing;
+        }
+
+        let my_pieces = self.pieces_by_side(self.active_side);
+
+        let mut allowed_moves = Vec::new();
+        for (origin, _) in my_pieces {
+            let mv_options = self
+                .get_movement_options(origin)
+                .expect("A piece must be here");
+
+            for mv in mv_options {
+                self.board.execute(&mv);
+                if !self.king_in_check(self.active_side) {
+                    allowed_moves.push(mv.clone());
+                }
+                self.board.undo(&mv);
+            }
+        }
+        if allowed_moves.len() == 0 {
+            return KingState::Mate;
+        } else {
+            return KingState::Check { allowed_moves };
+        }
+    }
+
+    pub fn get_movement_options(&self, pos: Position) -> Result<Vec<GameMove>> {
+        let mut mv = self.board.get_movement_options(pos)?;
+        mv.extend(self.get_en_passant_moves());
+        Ok(mv)
+    }
+
     fn get_en_passant_moves(&self) -> Vec<GameMove> {
         // -- check if last move enables a potential en passant
         let Some(last) = self.moves.last() else {
@@ -209,12 +256,22 @@ impl Game<NormalTurn> {
         moves
     }
 
-    pub fn get_movement_options(&self, pos: Position) -> Result<Vec<GameMove>> {
-        let mut mv = self.board.get_movement_options(pos)?;
-        mv.extend(self.get_en_passant_moves());
-        Ok(mv)
-    }
+    fn next_turn(mut self) -> NextTurn {
+        let current_player = self.active_side;
+        self.active_side = !self.active_side;
 
+        match self.check_king() {
+            KingState::Check { .. } | KingState::Nothing => {
+                NextTurn::Continued(self.transition(NormalTurn))
+            }
+            KingState::Mate => NextTurn::GameOver(self.transition(GameOver {
+                winner: current_player,
+            })),
+        }
+    }
+}
+
+impl Game<NormalTurn> {
     // Make a move using human coordinates
     pub fn make_human_move(
         self,
@@ -287,51 +344,7 @@ impl Game<NormalTurn> {
             }
         }
 
-        // -- Next turn
-        self.next_turn();
-        Ok(NextTurn::Continued(self))
-    }
-
-    pub fn king_in_check(&self, kings_side: Side) -> bool {
-        let enemy_pieces = self.pieces_by_side(!kings_side);
-        let Some((&pos_king, _)) = self.board.pieces.iter().find(|(_, piece)| {
-            piece.side == self.active_side && piece.piece_type == PieceType::King
-        }) else {
-            panic!("King is missing on board")
-        };
-
-        let is_check: bool = enemy_pieces.iter().any(|(&pos, _)| {
-            self.get_movement_options(pos)
-                .map(|options| options.iter().any(|x| x.destination == pos_king))
-                .unwrap()
-        });
-
-        is_check
-    }
-
-    pub fn check_king(&mut self) -> KingState {
-        if !self.king_in_check(self.active_side) {
-            return KingState::Nothing;
-        }
-
-        let my_pieces = self.pieces_by_side(self.active_side);
-
-        for (origin, _) in my_pieces {
-            let mv_options = self
-                .get_movement_options(origin)
-                .expect("A piece must be here");
-
-            for mv in mv_options {
-                self.board.execute(&mv);
-
-                if !self.king_in_check(self.active_side) {
-                    self.board.undo(&mv);
-                    return KingState::Check;
-                }
-                self.board.undo(&mv);
-            }
-        }
-        KingState::Mate
+        Ok(self.next_turn())
     }
 
     // Undo the last game move
@@ -369,9 +382,7 @@ impl Game<PromotePawn> {
             destination,
             action: Action::Promote { to: new_piece },
         });
-        self.next_turn();
-
-        Ok(NextTurn::Continued(self.transition(NormalTurn)))
+        Ok(self.next_turn())
     }
 
     pub fn undo(mut self) -> GameResult<Self> {
@@ -441,6 +452,22 @@ mod tests {
         let mut board = Board::default();
         let origin: Position = Position::from_human(('K', 5)).unwrap();
         let destination: Position = Position::from_human(('K', 6)).unwrap();
+
+        board.pieces.insert(
+            Position::from_human(('F', 5)).unwrap(),
+            Piece {
+                piece_type: PieceType::King,
+                side: Side::White,
+            },
+        );
+
+        board.pieces.insert(
+            Position::from_human(('I', 2)).unwrap(),
+            Piece {
+                piece_type: PieceType::King,
+                side: Side::Black,
+            },
+        );
 
         board.pieces.insert(
             origin,
@@ -632,13 +659,13 @@ mod tests {
             .pieces
             .insert(human(('F', 1)).unwrap(), Piece::new(Rook, Black));
 
-        assert_eq!(game.check_king(), KingState::Check);
+        assert!(matches!(game.check_king(), KingState::Check { .. }));
 
         game.board
             .pieces
             .insert(human(('E', 2)).unwrap(), Piece::new(Rook, Black));
 
-        assert_eq!(game.check_king(), KingState::Check);
+        assert!(matches!(game.check_king(), KingState::Check { .. }));
 
         let rook3_pos = human(('G', 1)).unwrap();
         game.board.pieces.insert(rook3_pos, Piece::new(Rook, Black));
@@ -647,7 +674,7 @@ mod tests {
             .pieces
             .insert(human(('D', 3)).unwrap(), Piece::new(Rook, Black));
 
-        assert_eq!(game.check_king(), KingState::Check);
+        assert!(matches!(game.check_king(), KingState::Check { .. }));
 
         game.board
             .pieces
@@ -659,7 +686,7 @@ mod tests {
             .pieces
             .insert(human(('K', 3)).unwrap(), Piece::new(Queen, White));
 
-        assert_eq!(game.check_king(), KingState::Check);
+        assert!(matches!(game.check_king(), KingState::Check { .. }));
     }
 
     #[test]
