@@ -1,0 +1,16 @@
+{
+  "name": "rusty-hex-chess",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Hexagonal chess engine in Rust with TypeScript frontend",
+  "scripts": {
+    "build:engine": "cd engine && wasm-pack build --target web",
+    "build:frontend": "cd frontend && npm run build",
+    "build": "npm run build:engine && npm run build:frontend",
+    "dev": "npm run build:engine && cd frontend && npm run dev",
+    "clean": "cd engine && wasm-pack clean && cd frontend && rm -rf dist node_modules"
+  },
+  "keywords": ["hexagonal chess", "wasm", "rust"],
+  "author": "Christian Langen",
+  "license": "MIT"
+}

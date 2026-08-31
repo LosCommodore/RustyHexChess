@@ -2,7 +2,7 @@
 
 use std::{error::Error, marker};
 
-use hexagon_logic::{
+use engine::{
     Game, NextTurn, Side,
     board::Board,
     coordinates::Position,
