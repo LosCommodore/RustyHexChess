@@ -12,6 +12,21 @@
         />
       </g>
 
+      <!-- Pieces -->
+      <g class="pieces">
+        <text
+          v-for="piece in pieces"
+          :key="`piece-${piece.x}-${piece.y}`"
+          :x="getHexCenterPixel(piece.x, piece.y).x"
+          :y="getHexCenterPixel(piece.x, piece.y).y"
+          class="piece"
+          :class="piece.color"
+          @click.stop="selectPiece(piece.x, piece.y)"
+        >
+          {{ pieceSymbols[piece.type] }}
+        </text>
+      </g>
+
       <!-- Selection highlight -->
       <polygon
         v-if="selectedHex && hexagons.find(h => h.q === selectedHex!.q && h.r === selectedHex!.r)"
@@ -36,7 +51,23 @@ interface HexCoord {
   r: number;
 }
 
+interface Piece {
+  x: number;
+  y: number;
+  type: string;
+  color: string;
+}
+
 const selectedHex = ref<HexCoord | null>(null);
+
+const pieceSymbols: Record<string, string> = {
+  pawn: '♟',
+  rook: '♜',
+  knight: '♞',
+  bishop: '♝',
+  queen: '♛',
+  king: '♚',
+};
 
 // Generate hexagonal chess board shape (hexagon of hexagons)
 const hexagons = computed(() => {
@@ -51,10 +82,46 @@ const hexagons = computed(() => {
   return hexes;
 });
 
+// Piece starting positions (pawns only - should form V-shape)
+const pieces = computed<Piece[]>(() => [
+  // White pawns
+  { x: 1, y: 4, type: 'pawn', color: 'white' },
+  { x: 2, y: 4, type: 'pawn', color: 'white' },
+  { x: 3, y: 4, type: 'pawn', color: 'white' },
+  { x: 4, y: 4, type: 'pawn', color: 'white' },
+  { x: 5, y: 4, type: 'pawn', color: 'white' },
+  { x: 6, y: 3, type: 'pawn', color: 'white' },
+  { x: 7, y: 2, type: 'pawn', color: 'white' },
+  { x: 8, y: 1, type: 'pawn', color: 'white' },
+  { x: 9, y: 0, type: 'pawn', color: 'white' },
+
+  // Black pawns
+  { x: 1, y: 10, type: 'pawn', color: 'black' },
+  { x: 2, y: 9, type: 'pawn', color: 'black' },
+  { x: 3, y: 8, type: 'pawn', color: 'black' },
+  { x: 4, y: 7, type: 'pawn', color: 'black' },
+  { x: 5, y: 6, type: 'pawn', color: 'black' },
+  { x: 6, y: 6, type: 'pawn', color: 'black' },
+  { x: 7, y: 6, type: 'pawn', color: 'black' },
+  { x: 8, y: 6, type: 'pawn', color: 'black' },
+  { x: 9, y: 6, type: 'pawn', color: 'black' },
+]);
+
+function engineToHex(engineX: number, engineY: number): HexCoord {
+  const q = engineY - 5;
+  const r = engineX - 5;
+  return { q, r };
+}
+
 function hexToPixel(q: number, r: number) {
   const x = HEX_RADIUS * (3 / 2 * q);
   const y = HEX_RADIUS * (Math.sqrt(3) / 2 * q + Math.sqrt(3) * r);
   return { x: CENTER_X + x, y: CENTER_Y + y };
+}
+
+function getHexCenterPixel(engineX: number, engineY: number) {
+  const hex = engineToHex(engineX, engineY);
+  return hexToPixel(hex.q, hex.r);
 }
 
 function getHexagonPoints(hex: HexCoord): string {
@@ -70,7 +137,9 @@ function getHexagonPoints(hex: HexCoord): string {
 }
 
 function getHexClass(hex: HexCoord): string {
-  return (hex.q + hex.r) % 2 === 0 ? 'light' : 'dark';
+  const colorIndex = ((hex.q + 2 * hex.r) % 3 + 3) % 3;
+  const colors = ['color1', 'color2', 'color3'] as const;
+  return colors[colorIndex];
 }
 
 function selectHex(hex: HexCoord) {
@@ -79,6 +148,11 @@ function selectHex(hex: HexCoord) {
   } else {
     selectedHex.value = { q: hex.q, r: hex.r };
   }
+}
+
+function selectPiece(engineX: number, engineY: number) {
+  const hex = engineToHex(engineX, engineY);
+  selectHex(hex);
 }
 </script>
 
@@ -103,11 +177,15 @@ function selectHex(hex: HexCoord) {
   transition: opacity 0.2s;
 }
 
-.hexagon.light {
+.hexagon.color1 {
   fill: #e8d5c4;
 }
 
-.hexagon.dark {
+.hexagon.color2 {
+  fill: #d18b47;
+}
+
+.hexagon.color3 {
   fill: #c9a876;
 }
 
@@ -121,5 +199,28 @@ function selectHex(hex: HexCoord) {
   stroke: #ff6b6b;
   stroke-width: 3;
   pointer-events: none;
+}
+
+.piece {
+  font-size: 40px;
+  text-anchor: middle;
+  dominant-baseline: middle;
+  cursor: pointer;
+  user-select: none;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+}
+
+.piece.white {
+  fill: #f0f0f0;
+  stroke: #333;
+  stroke-width: 0.8;
+  paint-order: stroke;
+}
+
+.piece.black {
+  fill: #333;
+  stroke: #f0f0f0;
+  stroke-width: 0.8;
+  paint-order: stroke;
 }
 </style>
