@@ -148,17 +148,19 @@ impl<T> Game<T> {
 }
 
 impl Game<NormalTurn> {
-    fn get_en_passant_moves(&self) -> Option<Vec<GameMove>> {
+    fn get_en_passant_moves(&self) -> Vec<GameMove> {
         // -- check if last move enables a potential en passant
-        let last = self.moves.last()?;
+        let Some(last) = self.moves.last() else {
+            return Vec::new();
+        };
 
         if last.piece.piece_type != PieceType::Pawn {
-            return None;
+            return Vec::new();
         }
 
         let dx = last.destination.coordinates().1 as isize - last.origin.coordinates().1 as isize;
         if dx.abs() < 2 {
-            return None;
+            return Vec::new();
         }
 
         // -- calculate the destination of en-passant
@@ -204,15 +206,12 @@ impl Game<NormalTurn> {
             }
         }
 
-        Some(moves)
+        moves
     }
 
     pub fn get_movement_options(&self, pos: Position) -> Result<Vec<GameMove>> {
         let mut mv = self.board.get_movement_options(pos)?;
-        let en_passant_mv = self.get_en_passant_moves();
-        if let Some(moves) = en_passant_mv {
-            mv.extend(moves)
-        };
+        mv.extend(self.get_en_passant_moves());
         Ok(mv)
     }
 

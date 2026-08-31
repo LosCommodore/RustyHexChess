@@ -157,7 +157,7 @@ impl Board {
         let capture_moves = pawn_capture_moves(color);
 
         for (dy, dx) in capture_moves {
-            let option = self.is_movement_option(pos, &me, *dy, *dx, Capability::Capture);
+            let option = self.is_movement_option(pos, me, *dy, *dx, Capability::Capture);
             options.extend(option);
         }
         options
@@ -168,7 +168,7 @@ impl Board {
         let mut options = Vec::new();
 
         for (dy, dx) in steps {
-            let option = self.is_movement_option(pos, &me, *dy, *dx, Capability::Both);
+            let option = self.is_movement_option(pos, me, *dy, *dx, Capability::Both);
             options.extend(option);
         }
 
@@ -187,7 +187,7 @@ impl Board {
         let mut pos = origin;
         let mut options = Vec::new();
         for _ in 0..nr_steps.unwrap_or(BOARD_DIM) {
-            let Some(mut new_move) = self.is_movement_option(pos, &me, dy, dx, capability) else {
+            let Some(mut new_move) = self.is_movement_option(pos, me, dy, dx, capability) else {
                 return options;
             };
             new_move.origin = origin;
@@ -212,7 +212,7 @@ impl Board {
                 self.pieces.insert(game_move.destination, me);
             }
             Action::Capture { pos: enemy_pos, .. } => {
-                self.pieces.remove(&enemy_pos);
+                self.pieces.remove(enemy_pos);
                 self.pieces.insert(game_move.destination, me);
             }
             Action::Promote { to } => {
