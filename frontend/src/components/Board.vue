@@ -15,12 +15,14 @@
       <!-- Pieces -->
       <g class="pieces">
         <text
-          v-for="piece in pieces"
-          :key="`piece-${piece.x}-${piece.y}`"
-          :x="getHexCenterPixel(piece.x, piece.y).x"
-          :y="getHexCenterPixel(piece.x, piece.y).y"
+          v-for="(piece, index) in pieces"
+          :key="`piece-${index}`"
+          :x="piece.pixelX"
+          :y="piece.pixelY"
           class="piece"
           :class="piece.color"
+          :style="{ cursor: 'grab' }"
+          @mousedown="startDrag($event, index)"
           @click.stop="selectPiece(piece.x, piece.y)"
         >
           {{ pieceSymbols[piece.type] }}
@@ -56,9 +58,14 @@ interface Piece {
   y: number;
   type: string;
   color: string;
+  pixelX: number;
+  pixelY: number;
 }
 
 const selectedHex = ref<HexCoord | null>(null);
+let draggedPieceIndex: number | null = null;
+let dragOffsetX = 0;
+let dragOffsetY = 0;
 
 const pieceSymbols: Record<string, string> = {
   pawn: '♟',
@@ -82,29 +89,35 @@ const hexagons = computed(() => {
   return hexes;
 });
 
+// Helper to create piece with pixel coordinates
+function createPiece(x: number, y: number, type: string, color: string): Piece {
+  const pixel = getHexCenterPixel(x, y);
+  return { x, y, type, color, pixelX: pixel.x, pixelY: pixel.y };
+}
+
 // Piece starting positions (pawns only - should form V-shape)
-const pieces = computed<Piece[]>(() => [
+const pieces = ref<Piece[]>([
   // White pawns
-  { x: 1, y: 4, type: 'pawn', color: 'white' },
-  { x: 2, y: 4, type: 'pawn', color: 'white' },
-  { x: 3, y: 4, type: 'pawn', color: 'white' },
-  { x: 4, y: 4, type: 'pawn', color: 'white' },
-  { x: 5, y: 4, type: 'pawn', color: 'white' },
-  { x: 6, y: 3, type: 'pawn', color: 'white' },
-  { x: 7, y: 2, type: 'pawn', color: 'white' },
-  { x: 8, y: 1, type: 'pawn', color: 'white' },
-  { x: 9, y: 0, type: 'pawn', color: 'white' },
+  createPiece(1, 4, 'pawn', 'white'),
+  createPiece(2, 4, 'pawn', 'white'),
+  createPiece(3, 4, 'pawn', 'white'),
+  createPiece(4, 4, 'pawn', 'white'),
+  createPiece(5, 4, 'pawn', 'white'),
+  createPiece(6, 3, 'pawn', 'white'),
+  createPiece(7, 2, 'pawn', 'white'),
+  createPiece(8, 1, 'pawn', 'white'),
+  createPiece(9, 0, 'pawn', 'white'),
 
   // Black pawns
-  { x: 1, y: 10, type: 'pawn', color: 'black' },
-  { x: 2, y: 9, type: 'pawn', color: 'black' },
-  { x: 3, y: 8, type: 'pawn', color: 'black' },
-  { x: 4, y: 7, type: 'pawn', color: 'black' },
-  { x: 5, y: 6, type: 'pawn', color: 'black' },
-  { x: 6, y: 6, type: 'pawn', color: 'black' },
-  { x: 7, y: 6, type: 'pawn', color: 'black' },
-  { x: 8, y: 6, type: 'pawn', color: 'black' },
-  { x: 9, y: 6, type: 'pawn', color: 'black' },
+  createPiece(1, 10, 'pawn', 'black'),
+  createPiece(2, 9, 'pawn', 'black'),
+  createPiece(3, 8, 'pawn', 'black'),
+  createPiece(4, 7, 'pawn', 'black'),
+  createPiece(5, 6, 'pawn', 'black'),
+  createPiece(6, 6, 'pawn', 'black'),
+  createPiece(7, 6, 'pawn', 'black'),
+  createPiece(8, 6, 'pawn', 'black'),
+  createPiece(9, 6, 'pawn', 'black'),
 ]);
 
 function engineToHex(engineX: number, engineY: number): HexCoord {
@@ -153,6 +166,58 @@ function selectHex(hex: HexCoord) {
 function selectPiece(engineX: number, engineY: number) {
   const hex = engineToHex(engineX, engineY);
   selectHex(hex);
+}
+
+function pixelToHex(pixelX: number, pixelY: number): { q: number; r: number } {
+  const x = pixelX - CENTER_X;
+  const y = pixelY - CENTER_Y;
+
+  const q = (2 / 3) * x / HEX_RADIUS;
+  const r = (-1 / 3) * x / HEX_RADIUS + (Math.sqrt(3) / 3) * y / HEX_RADIUS;
+
+  return { q: Math.round(q), r: Math.round(r) };
+}
+
+function startDrag(event: MouseEvent, index: number) {
+  draggedPieceIndex = index;
+  const piece = pieces.value[index];
+  if (!piece) return;
+  dragOffsetX = event.clientX - piece.pixelX;
+  dragOffsetY = event.clientY - piece.pixelY;
+
+  document.addEventListener('mousemove', handleDrag);
+  document.addEventListener('mouseup', endDrag);
+  (event.target as SVGTextElement).style.cursor = 'grabbing';
+}
+
+function handleDrag(event: MouseEvent) {
+  if (draggedPieceIndex === null) return;
+
+  const piece = pieces.value[draggedPieceIndex];
+  if (!piece) return;
+  piece.pixelX = event.clientX - dragOffsetX;
+  piece.pixelY = event.clientY - dragOffsetY;
+}
+
+function endDrag() {
+  if (draggedPieceIndex === null) return;
+
+  const piece = pieces.value[draggedPieceIndex];
+  if (!piece) return;
+  const hex = pixelToHex(piece.pixelX, piece.pixelY);
+
+  const validHex = hexagons.value.find(h => h.q === hex.q && h.r === hex.r);
+  if (validHex) {
+    piece.x = validHex.r + 5;
+    piece.y = validHex.q + 5;
+    const newPixel = getHexCenterPixel(piece.x, piece.y);
+    piece.pixelX = newPixel.x;
+    piece.pixelY = newPixel.y;
+  }
+
+  draggedPieceIndex = null;
+  document.removeEventListener('mousemove', handleDrag);
+  document.removeEventListener('mouseup', endDrag);
 }
 </script>
 
