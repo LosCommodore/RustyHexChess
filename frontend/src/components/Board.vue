@@ -52,14 +52,16 @@
       <!-- Rank labels (1-11) -->
       <g class="labels rank-labels">
         <g v-for="label in rankLabels" :key="`rank-${label.text}`">
-          <!-- ↙ is drawn at 45°; a rank actually runs 30° below horizontal -->
+          <!-- ↙ is drawn at 45°; rotate it steeper to read as the rank axis -->
           <text
             :x="label.x - 9"
             :y="label.y"
-            :transform="`rotate(15, ${label.x - 9}, ${label.y - 5})`"
+            :transform="`rotate(8, ${label.x - 9}, ${label.y - 5})`"
             class="label rank-arrow"
           >↙</text>
-          <text :x="label.x + 8" :y="label.y" class="label">{{ label.text }}</text>
+          <!-- Number sits up-right of the arrow: the two are 17px apart, and
+               17·tan(30°) ≈ 10, so the pair itself lies on the rank axis -->
+          <text :x="label.x + 8" :y="label.y - 10" class="label">{{ label.text }}</text>
         </g>
       </g>
     </svg>
@@ -374,7 +376,7 @@ const rankLabels = computed(() =>
 }
 
 .label.rank-arrow {
-  font-size: 15px;
+  font-size: 24px;
   font-weight: normal;
   opacity: 0.55;
 }
