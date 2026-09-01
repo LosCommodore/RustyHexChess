@@ -13,51 +13,6 @@ expression: options
             x: 4,
         },
         destination: Position {
-            y: 5,
-            x: 5,
-        },
-        action: Move,
-    },
-    GameMove {
-        piece: Piece {
-            piece_type: Pawn,
-            side: White,
-        },
-        origin: Position {
-            y: 5,
-            x: 4,
-        },
-        destination: Position {
-            y: 5,
-            x: 5,
-        },
-        action: Move,
-    },
-    GameMove {
-        piece: Piece {
-            piece_type: Pawn,
-            side: White,
-        },
-        origin: Position {
-            y: 5,
-            x: 4,
-        },
-        destination: Position {
-            y: 5,
-            x: 6,
-        },
-        action: Move,
-    },
-    GameMove {
-        piece: Piece {
-            piece_type: Pawn,
-            side: White,
-        },
-        origin: Position {
-            y: 5,
-            x: 4,
-        },
-        destination: Position {
             y: 6,
             x: 4,
         },
