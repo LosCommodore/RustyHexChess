@@ -35,6 +35,32 @@
         :points="getHexagonPoints(hexagons.find(h => h.q === selectedHex!.q && h.r === selectedHex!.r)!)"
         class="selected-hex"
       />
+
+      <!-- Column labels (a-k) -->
+      <g class="labels column-labels">
+        <text
+          v-for="label in columnLabels"
+          :key="`col-${label.text}`"
+          :x="label.x"
+          :y="label.y"
+          class="label"
+        >
+          {{ label.text }}
+        </text>
+      </g>
+
+      <!-- Row labels (1-11) -->
+      <g class="labels row-labels">
+        <text
+          v-for="y in 11"
+          :key="`row-${y}`"
+          :x="30"
+          :y="getHexCenterPixel(5, y - 1).y + 6"
+          class="label"
+        >
+          {{ y }}
+        </text>
+      </g>
     </svg>
   </div>
 </template>
@@ -152,7 +178,7 @@ function getHexagonPoints(hex: HexCoord): string {
 function getHexClass(hex: HexCoord): string {
   const colorIndex = ((hex.q + 2 * hex.r) % 3 + 3) % 3;
   const colors = ['color1', 'color2', 'color3'] as const;
-  return colors[colorIndex];
+  return colors[colorIndex]!;
 }
 
 function selectHex(hex: HexCoord) {
@@ -219,6 +245,22 @@ function endDrag() {
   document.removeEventListener('mousemove', handleDrag);
   document.removeEventListener('mouseup', endDrag);
 }
+
+// A visual column is all hexes sharing the same q — pixel x depends only on q.
+// Each label sits just under that column's lowest hexagon, so the row of
+// labels follows the board's V-shaped bottom edge.
+const columnLabels = computed(() =>
+  Array.from({ length: 11 }, (_, i) => {
+    const q = i - 5;
+    const rMax = Math.max(...hexagons.value.filter(h => h.q === q).map(h => h.r));
+    const bottom = hexToPixel(q, rMax);
+    return {
+      text: String.fromCharCode(97 + i),
+      x: bottom.x,
+      y: bottom.y + HEX_RADIUS + 22,
+    };
+  })
+);
 </script>
 
 <style scoped>
@@ -287,5 +329,18 @@ function endDrag() {
   stroke: #f0f0f0;
   stroke-width: 0.8;
   paint-order: stroke;
+}
+
+.label {
+  font-size: 20px;
+  font-weight: bold;
+  text-anchor: middle;
+  fill: #666;
+  pointer-events: none;
+  user-select: none;
+}
+
+.row-labels .label {
+  text-anchor: end;
 }
 </style>
