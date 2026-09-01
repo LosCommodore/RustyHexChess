@@ -8,7 +8,7 @@
           :key="`hex-${hex.q}-${hex.r}`"
           :points="getHexagonPoints(hex)"
           :class="['hexagon', getHexClass(hex), { marked: isMarked(hex) }]"
-          @click="selectHex(hex)"
+          @click="onHexClick(hex)"
         />
       </g>
 
@@ -22,7 +22,7 @@
           class="piece"
           :class="[piece.color, { dragging: piece.dragging, browsing: isBrowsing }]"
           @mousedown="startDrag($event, piece.index)"
-          @click.stop="selectHex(piece)"
+          @click.stop="onHexClick(piece)"
         >
           {{ PIECE_SYMBOLS[piece.type] }}
         </text>
@@ -80,10 +80,12 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import {
+  applyTool,
   game,
   isBrowsing,
   movePiece,
   PIECE_SYMBOLS,
+  placementTool,
   viewedPieces,
   type HexCoord,
 } from '@/game/state';
@@ -185,14 +187,24 @@ function getHexClass(hex: HexCoord): string {
   return colors[(((hex.q + 2 * hex.r) % 3) + 3) % 3]!;
 }
 
+/** With a setup tool active a click edits the board; otherwise it selects. */
+function onHexClick(hex: HexCoord) {
+  if (placementTool.value) {
+    applyTool(hex);
+    return;
+  }
+  selectHex(hex);
+}
+
 function selectHex(hex: HexCoord) {
   const isSelected = selectedHex.value?.q === hex.q && selectedHex.value?.r === hex.r;
   selectedHex.value = isSelected ? null : { q: hex.q, r: hex.r };
 }
 
 function startDrag(event: MouseEvent, index: number) {
-  // Past positions are for reading, not editing.
-  if (isBrowsing.value) return;
+  // Past positions are for reading, not editing; and a setup tool means the
+  // click is meant to place or erase, not drag.
+  if (isBrowsing.value || placementTool.value) return;
 
   const piece = game.pieces[index];
   if (!piece) return;

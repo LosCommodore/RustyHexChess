@@ -1,4 +1,4 @@
-import { computed, reactive } from 'vue';
+import { computed, reactive, ref } from 'vue';
 
 export type PlayerColor = 'white' | 'black';
 
@@ -218,6 +218,66 @@ export function undo() {
 
 export function setMode(mode: BoardMode) {
   game.mode = mode;
+  if (mode === 'game') placementTool.value = null;
+}
+
+// --- Board setup --------------------------------------------------------
+
+/** What a click on the board does while setting a position up. */
+export type PlacementTool =
+  | { kind: 'piece'; type: PieceType; color: PlayerColor }
+  | { kind: 'erase' }
+  | null;
+
+export const placementTool = ref<PlacementTool>(null);
+
+export function selectTool(tool: PlacementTool) {
+  placementTool.value = tool;
+  // Placing pieces is setup, never a move.
+  if (tool) game.mode = 'free';
+}
+
+/**
+ * Adding or removing pieces shifts the indices the history refers to, so a
+ * structural edit necessarily starts a fresh position rather than corrupting
+ * the move list.
+ */
+function resetHistory() {
+  game.history = [];
+  game.viewIndex = 0;
+  game.moveNumber = 1;
+  game.activePlayer = 'white';
+}
+
+function indexAt(hex: HexCoord): number {
+  return game.pieces.findIndex(p => p.q === hex.q && p.r === hex.r);
+}
+
+/** Applies the selected tool to a hex: places a piece, or clears the hex. */
+export function applyTool(hex: HexCoord) {
+  const tool = placementTool.value;
+  if (!tool) return;
+
+  const existing = indexAt(hex);
+  if (existing >= 0) game.pieces.splice(existing, 1);
+
+  if (tool.kind === 'piece') {
+    game.pieces.push({ q: hex.q, r: hex.r, type: tool.type, color: tool.color });
+  } else if (existing < 0) {
+    return; // erasing an empty hex changes nothing
+  }
+
+  resetHistory();
+}
+
+export function clearBoard() {
+  game.pieces = [];
+  resetHistory();
+}
+
+export function resetPosition() {
+  game.pieces = INITIAL_PIECES.map(piece => ({ ...piece }));
+  resetHistory();
 }
 
 // --- Demo data ----------------------------------------------------------
