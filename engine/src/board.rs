@@ -83,7 +83,9 @@ impl Board {
                 MovementPattern::Walk { direction, limit } => {
                     moves.extend(self.get_walk_moves(me, pos, *direction, *limit, Capability::Both))
                 }
-                MovementPattern::Step(steps) => moves.extend(self.get_step_moves(me, pos, steps)),
+                MovementPattern::Step(steps) => {
+                    moves.extend(self.get_step_moves(me, pos, steps, Capability::Both))
+                }
                 MovementPattern::Pawn => moves.extend(self.get_pawn_moves(me, pos)),
             }
         }
@@ -144,7 +146,7 @@ impl Board {
         let direction = (0, orientation);
 
         // --- the normal step of the figure
-        options.extend(self.get_step_moves(me, pos, &[direction]));
+        options.extend(self.get_step_moves(me, pos, &[direction], Capability::Move));
 
         // --- walk two steps from starting position
         let starting_positions = pawn_starting_positions(color);
@@ -164,11 +166,17 @@ impl Board {
     }
 
     // A step is a direct move to another position, no blocking of movements.
-    fn get_step_moves(&self, me: &Piece, pos: Position, steps: &[(isize, isize)]) -> Vec<GameMove> {
+    fn get_step_moves(
+        &self,
+        me: &Piece,
+        pos: Position,
+        steps: &[(isize, isize)],
+        capability: Capability,
+    ) -> Vec<GameMove> {
         let mut options = Vec::new();
 
         for (dy, dx) in steps {
-            let option = self.is_movement_option(pos, me, *dy, *dx, Capability::Both);
+            let option = self.is_movement_option(pos, me, *dy, *dx, capability);
             options.extend(option);
         }
 
@@ -429,6 +437,14 @@ mod tests {
                 side: Side::Black,
             },
         );
+        board.pieces.insert(
+            Position::from_human(('F', 6)).unwrap(),
+            Piece {
+                piece_type: PieceType::Rook,
+                side: Side::Black,
+            },
+        );
+
         board.pieces.insert(
             Position::from_human(('E', 6)).unwrap(),
             Piece {
