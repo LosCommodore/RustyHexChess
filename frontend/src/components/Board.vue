@@ -49,17 +49,15 @@
         </text>
       </g>
 
-      <!-- Row labels (1-11) -->
-      <g class="labels row-labels">
+      <!-- Rank labels (1-11) -->
+      <g class="labels rank-labels">
         <text
-          v-for="y in 11"
-          :key="`row-${y}`"
-          :x="30"
-          :y="getHexCenterPixel(5, y - 1).y + 6"
+          v-for="label in rankLabels"
+          :key="`rank-${label.text}`"
+          :x="label.x"
+          :y="label.y"
           class="label"
-        >
-          {{ y }}
-        </text>
+        ><tspan class="rank-arrow">↙</tspan><tspan dx="3">{{ label.text }}</tspan></text>
       </g>
     </svg>
   </div>
@@ -246,6 +244,12 @@ function endDrag() {
   document.removeEventListener('mouseup', endDrag);
 }
 
+const LABEL_GAP = HEX_RADIUS + 22;
+// Hex height is √3·R, so a quarter of it is half the y-step between columns.
+const QUARTER_HEX = (Math.sqrt(3) * HEX_RADIUS) / 4;
+// Pulls the rank labels back toward the board; the ↙ glyph widens them.
+const RANK_SHIFT_X = -10;
+
 // A visual column is all hexes sharing the same q — pixel x depends only on q.
 // Each label sits just under that column's lowest hexagon, so the row of
 // labels follows the board's V-shaped bottom edge.
@@ -257,7 +261,29 @@ const columnLabels = computed(() =>
     return {
       text: String.fromCharCode(97 + i),
       x: bottom.x,
-      y: bottom.y + HEX_RADIUS + 22,
+      y: bottom.y + LABEL_GAP,
+    };
+  })
+);
+
+// A rank is the up-right diagonal: all hexes sharing s = -(q + r). Each label
+// sits outside that rank's rightmost hex. Ranks 1-6 hang off the right column
+// (which is 6 hexes tall, so they share an x); ranks 7-11 anchor on the
+// upper-right edge, so their x steps left as they climb.
+const rankLabels = computed(() =>
+  Array.from({ length: 11 }, (_, i) => {
+    const s = i - 5;
+    const rank = hexagons.value.filter(h => -(h.q + h.r) === s);
+    const anchor = rank.reduce((a, h) => (h.q > a.q ? h : a));
+    const p = hexToPixel(anchor.q, anchor.r);
+    const [dx, dy] = s <= 0 ? [1, 0] : [0.5, -Math.sqrt(3) / 2];
+    // Ranks hanging off the right column rise two quarter-hexes so each number
+    // lands on its own ↙ diagonal instead of level with the hex centre.
+    const rise = s <= 0 ? 2 * QUARTER_HEX : 0;
+    return {
+      text: String(i + 1),
+      x: p.x + dx * LABEL_GAP + RANK_SHIFT_X,
+      y: p.y + dy * LABEL_GAP - rise + 7,
     };
   })
 );
@@ -331,6 +357,11 @@ const columnLabels = computed(() =>
   paint-order: stroke;
 }
 
+.rank-arrow {
+  font-size: 14px;
+  opacity: 0.55;
+}
+
 .label {
   font-size: 20px;
   font-weight: bold;
@@ -338,9 +369,5 @@ const columnLabels = computed(() =>
   fill: #666;
   pointer-events: none;
   user-select: none;
-}
-
-.row-labels .label {
-  text-anchor: end;
 }
 </style>
