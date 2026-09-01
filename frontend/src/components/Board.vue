@@ -51,13 +51,16 @@
 
       <!-- Rank labels (1-11) -->
       <g class="labels rank-labels">
-        <text
-          v-for="label in rankLabels"
-          :key="`rank-${label.text}`"
-          :x="label.x"
-          :y="label.y"
-          class="label"
-        ><tspan class="rank-arrow">↙</tspan><tspan dx="3">{{ label.text }}</tspan></text>
+        <g v-for="label in rankLabels" :key="`rank-${label.text}`">
+          <!-- ↙ is drawn at 45°; a rank actually runs 30° below horizontal -->
+          <text
+            :x="label.x - 9"
+            :y="label.y"
+            :transform="`rotate(15, ${label.x - 9}, ${label.y - 5})`"
+            class="label rank-arrow"
+          >↙</text>
+          <text :x="label.x + 8" :y="label.y" class="label">{{ label.text }}</text>
+        </g>
       </g>
     </svg>
   </div>
@@ -280,10 +283,14 @@ const rankLabels = computed(() =>
     // Ranks hanging off the right column rise two quarter-hexes so each number
     // lands on its own ↙ diagonal instead of level with the hex centre.
     const rise = s <= 0 ? 2 * QUARTER_HEX : 0;
+    // Ranks 7-11 anchor on the upper-right edge with a different offset
+    // direction, which overshoots by half a row. Step them back half a
+    // hexagon along that edge so the run stays contiguous with rank 6.
+    const back = s > 0 ? 0.6 : 0;
     return {
       text: String(i + 1),
-      x: p.x + dx * LABEL_GAP + RANK_SHIFT_X,
-      y: p.y + dy * LABEL_GAP - rise + 7,
+      x: p.x + dx * LABEL_GAP + RANK_SHIFT_X + back * HEX_RADIUS * 1.5,
+      y: p.y + dy * LABEL_GAP - rise + 7 + back * 2 * QUARTER_HEX,
     };
   })
 );
@@ -357,11 +364,6 @@ const rankLabels = computed(() =>
   paint-order: stroke;
 }
 
-.rank-arrow {
-  font-size: 14px;
-  opacity: 0.55;
-}
-
 .label {
   font-size: 20px;
   font-weight: bold;
@@ -369,5 +371,11 @@ const rankLabels = computed(() =>
   fill: #666;
   pointer-events: none;
   user-select: none;
+}
+
+.label.rank-arrow {
+  font-size: 15px;
+  font-weight: normal;
+  opacity: 0.55;
 }
 </style>
