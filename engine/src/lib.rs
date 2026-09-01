@@ -1,8 +1,15 @@
+pub mod api;
 pub mod board;
 pub mod coordinates;
-pub mod display;
 mod movement;
 pub mod piece;
+
+/// Terminal and HTML rendering. Not available on wasm: it draws with crossterm.
+#[cfg(not(target_family = "wasm"))]
+pub mod display;
+
+#[cfg(target_family = "wasm")]
+pub mod wasm;
 
 use std::{collections::HashMap, ops::Not};
 
@@ -135,6 +142,16 @@ impl<T> Game<T> {
         &self.board
     }
 
+    pub fn active_side(&self) -> Side {
+        self.active_side
+    }
+
+    /// The moves played so far, oldest first. A promotion appears as its own
+    /// entry after the pawn move that triggered it.
+    pub fn moves(&self) -> &[GameMove] {
+        &self.moves
+    }
+
     pub fn pieces_by_side(&self, side: Side) -> HashMap<Position, Piece> {
         self.board
             .pieces
@@ -146,9 +163,12 @@ impl<T> Game<T> {
 
     pub fn king_in_check(&mut self, kings_side: Side) -> bool {
         let enemy_pieces = self.pieces_by_side(!kings_side);
-        let Some((&pos_king, _)) = self.board.pieces.iter().find(|(_, piece)| {
-            piece.side == self.active_side && piece.piece_type == PieceType::King
-        }) else {
+        let Some((&pos_king, _)) = self
+            .board
+            .pieces
+            .iter()
+            .find(|(_, piece)| piece.side == kings_side && piece.piece_type == PieceType::King)
+        else {
             panic!("King is missing on board")
         };
 
@@ -281,6 +301,13 @@ impl<T> Game<T> {
 }
 
 impl Game<NormalTurn> {
+    /// Sets who moves first. Only meaningful before any move has been played,
+    /// i.e. when a game starts from a position that was set up by hand.
+    pub fn with_active_side(mut self, side: Side) -> Self {
+        self.active_side = side;
+        self
+    }
+
     // Make a move using human coordinates
     pub fn make_human_move(
         self,
@@ -368,6 +395,12 @@ impl Game<NormalTurn> {
         self.board.undo(&mv);
         self.active_side = !self.active_side;
         Ok(self.undo_next_turn(mv))
+    }
+}
+
+impl Game<GameOver> {
+    pub fn winner(&self) -> Side {
+        self._state.winner
     }
 }
 
