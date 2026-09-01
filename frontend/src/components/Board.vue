@@ -7,7 +7,7 @@
           v-for="hex in hexagons"
           :key="`hex-${hex.q}-${hex.r}`"
           :points="getHexagonPoints(hex)"
-          :class="['hexagon', getHexClass(hex)]"
+          :class="['hexagon', getHexClass(hex), { marked: isMarked(hex) }]"
           @click="selectHex(hex)"
         />
       </g>
@@ -20,12 +20,25 @@
           :x="piece.x"
           :y="piece.y"
           class="piece"
-          :class="[piece.color, { dragging: piece.dragging }]"
+          :class="[piece.color, { dragging: piece.dragging, browsing: isBrowsing }]"
           @mousedown="startDrag($event, piece.index)"
           @click.stop="selectHex(piece)"
         >
-          {{ pieceSymbols[piece.type] }}
+          {{ PIECE_SYMBOLS[piece.type] }}
         </text>
+      </g>
+
+      <!-- Move markers sit above the pieces so a capture ring reads on top of
+           the enemy piece it targets -->
+      <g class="markers">
+        <circle
+          v-for="marker in renderedMarkers"
+          :key="`marker-${marker.q}-${marker.r}`"
+          :cx="marker.x"
+          :cy="marker.y"
+          :r="marker.radius"
+          :class="['marker', marker.kind]"
+        />
       </g>
 
       <!-- Selection highlight -->
@@ -66,6 +79,14 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue';
+import {
+  game,
+  isBrowsing,
+  movePiece,
+  PIECE_SYMBOLS,
+  viewedPieces,
+  type HexCoord,
+} from '@/game/state';
 
 const HEX_RADIUS = 40;
 const SVG_WIDTH = 800;
@@ -73,26 +94,6 @@ const SVG_HEIGHT = 900;
 const CENTER_X = 400;
 const CENTER_Y = 450;
 const BOARD_RADIUS = 5;
-
-/** Axial hex coordinate. q selects the visual column, r the row within it. */
-interface HexCoord {
-  q: number;
-  r: number;
-}
-
-interface Piece extends HexCoord {
-  type: string;
-  color: string;
-}
-
-const pieceSymbols: Record<string, string> = {
-  pawn: '♟',
-  rook: '♜',
-  knight: '♞',
-  bishop: '♝',
-  queen: '♛',
-  king: '♚',
-};
 
 // The board is a hexagon of hexagons: every axial coord whose three cube
 // components stay within BOARD_RADIUS. Constant, so not a computed.
@@ -103,31 +104,43 @@ for (let q = -BOARD_RADIUS; q <= BOARD_RADIUS; q++) {
   }
 }
 
-const pieces = ref<Piece[]>([
-  // White pawns
-  { q: -1, r: -4, type: 'pawn', color: 'white' },
-  { q: -1, r: -3, type: 'pawn', color: 'white' },
-  { q: -1, r: -2, type: 'pawn', color: 'white' },
-  { q: -1, r: -1, type: 'pawn', color: 'white' },
-  { q: -1, r: 0, type: 'pawn', color: 'white' },
-  { q: -2, r: 1, type: 'pawn', color: 'white' },
-  { q: -3, r: 2, type: 'pawn', color: 'white' },
-  { q: -4, r: 3, type: 'pawn', color: 'white' },
-  { q: -5, r: 4, type: 'pawn', color: 'white' },
+const selectedHex = ref<HexCoord | null>(null);
 
-  // Black pawns
-  { q: 5, r: -4, type: 'pawn', color: 'black' },
-  { q: 4, r: -3, type: 'pawn', color: 'black' },
-  { q: 3, r: -2, type: 'pawn', color: 'black' },
-  { q: 2, r: -1, type: 'pawn', color: 'black' },
-  { q: 1, r: 0, type: 'pawn', color: 'black' },
-  { q: 1, r: 1, type: 'pawn', color: 'black' },
-  { q: 1, r: 2, type: 'pawn', color: 'black' },
-  { q: 1, r: 3, type: 'pawn', color: 'black' },
-  { q: 1, r: 4, type: 'pawn', color: 'black' },
+/** A hex highlighted as a move option: a dot for a step, a ring for a capture. */
+type MarkerKind = 'move' | 'capture';
+interface Marker extends HexCoord {
+  kind: MarkerKind;
+}
+
+// Placeholder until the engine supplies real move generation — these are just
+// a few hexes around the centre so the layer is visible.
+const markers = ref<Marker[]>([
+  { q: 0, r: -1, kind: 'move' },
+  { q: 1, r: -1, kind: 'move' },
+  { q: 0, r: 1, kind: 'move' },
+  { q: -1, r: 0, kind: 'capture' },
 ]);
 
-const selectedHex = ref<HexCoord | null>(null);
+// Move options are meaningless while placing pieces freely.
+const activeMarkers = computed(() => (game.mode === 'game' ? markers.value : []));
+
+// Set of "q,r" keys so the per-hex lookup below stays O(1) across 91 hexes.
+const markedHexes = computed(() => new Set(activeMarkers.value.map(m => `${m.q},${m.r}`)));
+
+function isMarked(hex: HexCoord): boolean {
+  return markedHexes.value.has(`${hex.q},${hex.r}`);
+}
+
+const MARKER_DOT = HEX_RADIUS * 0.28;
+const MARKER_RING = HEX_RADIUS * 0.72;
+
+const renderedMarkers = computed(() =>
+  activeMarkers.value.map(marker => ({
+    ...marker,
+    ...hexToPixel(marker.q, marker.r),
+    radius: marker.kind === 'capture' ? MARKER_RING : MARKER_DOT,
+  }))
+);
 
 /** Live drag, if any. Holds the pixel position the piece is rendered at. */
 const drag = ref<{ index: number; x: number; y: number; grabX: number; grabY: number } | null>(null);
@@ -135,7 +148,7 @@ const drag = ref<{ index: number; x: number; y: number; grabX: number; grabY: nu
 // A piece sits at its hex centre, except while dragged: then the cursor wins.
 // Pixel position is derived, never stored, so the two can never disagree.
 const renderedPieces = computed(() =>
-  pieces.value.map((piece, index) => {
+  viewedPieces.value.map((piece, index) => {
     const dragging = drag.value?.index === index;
     const pixel = dragging && drag.value
       ? { x: drag.value.x, y: drag.value.y }
@@ -178,7 +191,10 @@ function selectHex(hex: HexCoord) {
 }
 
 function startDrag(event: MouseEvent, index: number) {
-  const piece = pieces.value[index];
+  // Past positions are for reading, not editing.
+  if (isBrowsing.value) return;
+
+  const piece = game.pieces[index];
   if (!piece) return;
   const pixel = hexToPixel(piece.q, piece.r);
   drag.value = {
@@ -204,11 +220,7 @@ function endDrag() {
 
   const dropped = pixelToHex(current.x, current.y);
   const target = hexagons.find(h => h.q === dropped.q && h.r === dropped.r);
-  const piece = pieces.value[current.index];
-  if (target && piece) {
-    piece.q = target.q;
-    piece.r = target.r;
-  }
+  if (target) movePiece(current.index, target);
 
   drag.value = null;
   document.removeEventListener('mousemove', handleDrag);
@@ -278,12 +290,12 @@ const rankLabels = computed(() =>
 </script>
 
 <style scoped>
+/* No padding or background: the page owns both, so the board's top edge
+   lines up with whatever sits beside it. */
 .board-container {
   display: flex;
   justify-content: center;
-  align-items: center;
-  padding: 20px;
-  background: #f5f5f5;
+  align-items: flex-start;
 }
 
 .board-svg {
@@ -315,11 +327,33 @@ const rankLabels = computed(() =>
   stroke-width: 2.5;
 }
 
+/* Lighten the movement path. brightness() works off whatever base fill the
+   hex has, so one rule covers all three board colours. Flip to a value below
+   1 and invert the selector to darken everything else instead. */
+.hexagon.marked {
+  filter: brightness(1.35);
+}
+
 .selected-hex {
   fill: none;
   stroke: #ff6b6b;
   stroke-width: 3;
   pointer-events: none;
+}
+
+/* Markers never swallow clicks — the hex underneath stays selectable. */
+.marker {
+  pointer-events: none;
+}
+
+.marker.move {
+  fill: rgba(30, 110, 50, 0.5);
+}
+
+.marker.capture {
+  fill: none;
+  stroke: rgba(190, 45, 45, 0.65);
+  stroke-width: 5;
 }
 
 .piece {
@@ -333,6 +367,11 @@ const rankLabels = computed(() =>
 
 .piece.dragging {
   cursor: grabbing;
+}
+
+/* While browsing history the board is a read-only replay. */
+.piece.browsing {
+  cursor: default;
 }
 
 .piece.white {
