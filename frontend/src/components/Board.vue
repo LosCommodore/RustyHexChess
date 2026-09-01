@@ -59,9 +59,9 @@
             :transform="`rotate(8, ${label.x - 9}, ${label.y - 5})`"
             class="label rank-arrow"
           >↙</text>
-          <!-- Number sits up-right of the arrow: the two are 17px apart, and
-               17·tan(30°) ≈ 10, so the pair itself lies on the rank axis -->
-          <text :x="label.x + 8" :y="label.y - 10" class="label">{{ label.text }}</text>
+          <!-- Number sits up-right of the arrow, offset along the rank axis
+               itself: 24px apart horizontally, 24·tan(30°) ≈ 14 up -->
+          <text :x="label.x + 15" :y="label.y - 14" class="label">{{ label.text }}</text>
         </g>
       </g>
     </svg>
