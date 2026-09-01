@@ -144,7 +144,7 @@ impl<T> Game<T> {
             .collect()
     }
 
-    pub fn king_in_check(&self, kings_side: Side) -> bool {
+    pub fn king_in_check(&mut self, kings_side: Side) -> bool {
         let enemy_pieces = self.pieces_by_side(!kings_side);
         let Some((&pos_king, _)) = self.board.pieces.iter().find(|(_, piece)| {
             piece.side == self.active_side && piece.piece_type == PieceType::King
@@ -153,12 +153,22 @@ impl<T> Game<T> {
         };
 
         let is_check: bool = enemy_pieces.iter().any(|(&pos, _)| {
-            self.get_movement_options(pos)
-                .map(|options| options.iter().any(|x| x.destination == pos_king))
-                .unwrap()
+            // movement options from board here, just the direct threads to the king, ignoring that the figure is pinned, en passant etc.
+            self.board
+                .get_movement_options(pos)
+                .expect("Invalid position ???")
+                .iter()
+                .any(|x| x.destination == pos_king)
         });
 
         is_check
+    }
+
+    pub fn move_creates_check_on_active_king(&mut self, mv: &GameMove) -> bool {
+        self.board.execute(&mv);
+        let check = self.king_in_check(self.active_side);
+        self.board.undo(&mv);
+        check
     }
 
     pub fn check_king(&mut self) -> KingState {
@@ -175,11 +185,9 @@ impl<T> Game<T> {
                 .expect("A piece must be here");
 
             for mv in mv_options {
-                self.board.execute(&mv);
-                if !self.king_in_check(self.active_side) {
+                if !self.move_creates_check_on_active_king(&mv) {
                     allowed_moves.push(mv.clone());
                 }
-                self.board.undo(&mv);
             }
         }
         if allowed_moves.len() == 0 {
@@ -189,9 +197,10 @@ impl<T> Game<T> {
         }
     }
 
-    pub fn get_movement_options(&self, pos: Position) -> Result<Vec<GameMove>> {
+    pub fn get_movement_options(&mut self, pos: Position) -> Result<Vec<GameMove>> {
         let mut mv = self.board.get_movement_options(pos)?;
         mv.extend(self.get_en_passant_moves());
+        mv.retain(|x| !self.move_creates_check_on_active_king(x));
         Ok(mv)
     }
 
@@ -298,7 +307,7 @@ impl Game<NormalTurn> {
         self.make_move(origin, destination)
     }
 
-    fn validate_move(&self, origin: Position, destination: Position) -> Result<GameMove> {
+    fn validate_move(&mut self, origin: Position, destination: Position) -> Result<GameMove> {
         let piece = self
             .board
             .pieces
@@ -525,6 +534,14 @@ mod tests {
             },
         );
 
+        board.pieces.insert(
+            Position::from_human(('I', 2)).unwrap(),
+            Piece {
+                piece_type: PieceType::King,
+                side: Side::Black,
+            },
+        );
+
         let mut game = new_game(Some(board));
 
         let is_check = game.king_in_check(Side::White);
@@ -653,6 +670,10 @@ mod tests {
             .pieces
             .insert(human(('F', 5)).unwrap(), Piece::new(King, White));
 
+        game.board
+            .pieces
+            .insert(human(('A', 11)).unwrap(), Piece::new(King, Black));
+
         assert_eq!(game.check_king(), KingState::Nothing);
 
         game.board
@@ -697,7 +718,7 @@ mod tests {
     }
 
     #[test]
-    fn test_en_passant() {
+    fn test_en_passant() -> Result<(), UserError> {
         use PieceType::*;
         use Side::*;
         let human = Position::from_human;
@@ -710,11 +731,11 @@ mod tests {
 
         game.board
             .pieces
-            .insert(human(('F', 5)).unwrap(), Piece::new(King, White));
+            .insert(human(('A', 11)).unwrap(), Piece::new(King, White));
 
         game.board
             .pieces
-            .insert(human(('I', 2)).unwrap(), Piece::new(King, Black));
+            .insert(human(('K', 6)).unwrap(), Piece::new(King, Black));
 
         game.board
             .pieces
@@ -724,24 +745,58 @@ mod tests {
             .pieces
             .insert(black_pawn_origin, Piece::new(Pawn, Black));
 
-        let Ok(NextTurn::Continued(mut game)) =
-            game.make_move(white_pawn_origin, white_pawn_destination)
+        let NextTurn::Continued(mut game) = game
+            .make_move(white_pawn_origin, white_pawn_destination)
+            .map_err(|e| e.error)?
         else {
             panic!("invalid game state")
         };
 
         mark_and_snap(&mut game, &[black_pawn_origin], "test_en_passant");
 
-        let Ok(NextTurn::Continued(mut game)) =
-            game.make_move(black_pawn_origin, human(('j', 2)).unwrap())
+        let NextTurn::Continued(mut game) = game
+            .make_move(black_pawn_origin, human(('j', 2)).unwrap())
+            .map_err(|e| e.error)?
         else {
             panic!("invalid game state")
         };
         mark_and_snap(&mut game, &[], "test_en_passant_2");
 
-        let Ok(NextTurn::Continued(mut game)) = game.undo() else {
+        let NextTurn::Continued(mut game) = game.undo().map_err(|e| e.error)? else {
             panic!("invalid game state")
         };
         mark_and_snap(&mut game, &[], "test_en_passant_3");
+        Ok(())
+    }
+
+    #[test]
+    fn test_disallow_pinned_moves() -> Result<(), UserError> {
+        use PieceType::*;
+        use Side::*;
+        let human = Position::from_human;
+
+        let board = Board::default();
+        let mut game = new_game(Some(board));
+
+        let white_rook_pos = human(('I', 4)).unwrap();
+        game.board
+            .pieces
+            .insert(human(('I', 6)).unwrap(), Piece::new(King, White));
+
+        game.board
+            .pieces
+            .insert(human(('C', 5)).unwrap(), Piece::new(King, Black));
+
+        game.board
+            .pieces
+            .insert(white_rook_pos, Piece::new(Rook, White));
+
+        game.board
+            .pieces
+            .insert(human(('I', 1)).unwrap(), Piece::new(Rook, Black));
+
+        mark_and_snap(&mut game, &[white_rook_pos], "test_disallow_pinned_moves");
+
+        Ok(())
     }
 }

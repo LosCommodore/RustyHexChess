@@ -1,0 +1,75 @@
+---
+source: engine/src/lib.rs
+expression: options
+---
+[
+    GameMove {
+        piece: Piece {
+            piece_type: Rook,
+            side: White,
+        },
+        origin: Position {
+            y: 8,
+            x: 3,
+        },
+        destination: Position {
+            y: 8,
+            x: 4,
+        },
+        action: Move,
+    },
+    GameMove {
+        piece: Piece {
+            piece_type: Rook,
+            side: White,
+        },
+        origin: Position {
+            y: 8,
+            x: 3,
+        },
+        destination: Position {
+            y: 8,
+            x: 2,
+        },
+        action: Move,
+    },
+    GameMove {
+        piece: Piece {
+            piece_type: Rook,
+            side: White,
+        },
+        origin: Position {
+            y: 8,
+            x: 3,
+        },
+        destination: Position {
+            y: 8,
+            x: 1,
+        },
+        action: Move,
+    },
+    GameMove {
+        piece: Piece {
+            piece_type: Rook,
+            side: White,
+        },
+        origin: Position {
+            y: 8,
+            x: 3,
+        },
+        destination: Position {
+            y: 8,
+            x: 0,
+        },
+        action: Capture {
+            enemy: Piece {
+                piece_type: Rook,
+                side: Black,
+            },
+            pos: Position {
+                y: 8,
+                x: 0,
+            },
+        },
+    },
+]
