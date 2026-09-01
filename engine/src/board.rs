@@ -145,14 +145,14 @@ impl Board {
         let orientation = if color == Side::White { 1 } else { -1 };
         let direction = (0, orientation);
 
-        // --- the normal step of the figure
-        options.extend(self.get_step_moves(me, pos, &[direction], Capability::Move));
-
         // --- walk two steps from starting position
         let starting_positions = pawn_starting_positions(color);
 
         if starting_positions.contains(&pos) {
             options.extend(self.get_walk_moves(me, pos, direction, Some(2), Capability::Move));
+        } else {
+            // --- the normal step of the figure
+            options.extend(self.get_step_moves(me, pos, &[direction], Capability::Move));
         }
 
         // --- capture diagonally
