@@ -1,4 +1,4 @@
-//pub mod api;
+pub mod api;
 pub mod board;
 pub mod coordinates;
 mod movement;
@@ -104,6 +104,11 @@ impl Game {
 
     pub fn active_side(&self) -> Side {
         self.active_side
+    }
+
+    /// Which command the game will accept next.
+    pub fn state(&self) -> GameState {
+        self.state
     }
 
     /// The winning side. `None` is a draw (remis).
