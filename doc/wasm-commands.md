@@ -1,5 +1,20 @@
 # Rust → WASM: commands and references
 
+## The two tools
+
+**wasm-bindgen** is the library plus a CLI: it generates the glue that lets Rust
+types cross into JS, and emits the `.d.ts`. **wasm-pack** drives the pipeline
+around it — `cargo build --target wasm32`, then wasm-bindgen, then `wasm-opt`,
+then an npm-shaped `pkg/`. Frameworks that own the whole page (Trunk, Leptos,
+Dioxus) call wasm-bindgen directly and skip wasm-pack; a Rust lib consumed by a
+JS frontend, like this one, wants wasm-pack.
+
+Both are current. The `rustwasm` org was sunset in July 2025 and that post said
+wasm-pack would be archived — it wasn't. Both projects moved to the new
+`wasm-bindgen` org with new maintainers, and wasm-pack has shipped since
+(0.13.1, 0.14.0, 0.15.0 in May 2026). Blog posts calling it dead predate the
+handover.
+
 ## Setup (once)
 
 ```bash
@@ -52,8 +67,7 @@ it is the contract the frontend compiles against.
 
 ## Documentation
 
-The whole toolchain moved out of the dormant `rustwasm` org into its own
-`wasm-bindgen` org. Anything on `rustwasm.github.io` is stale or 404.
+Anything on `rustwasm.github.io` is stale or 404 — see above.
 
 - **[wasm-bindgen Guide](https://wasm-bindgen.github.io/wasm-bindgen/)** — the
   reference. Two pages carry most of it: *Supported Types* (what can cross the
