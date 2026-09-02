@@ -1,4 +1,11 @@
 {
+  // rust-analyzer analyzes ONE target. On the host default, `engine/src/wasm.rs`
+  // is cfg'd out of the module tree and gets no IDE support at all. Pointing it
+  // at wasm32 fixes that and costs the reverse: `display.rs`, `bin/main.rs` and
+  // the `use crate::display::...` in lib.rs's test module go unresolved.
+  // Comment this line out to analyze the native side again.
+  "rust-analyzer.cargo.target": "wasm32-unknown-unknown",
+
   "editor.inlayHints.enabled": "offUnlessPressed",
   "rust-analyzer.inlayHints.typeHints.enable": false,
   "rust-analyzer.inlayHints.parameterHints.enable": true,

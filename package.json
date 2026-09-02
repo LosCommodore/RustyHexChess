@@ -4,12 +4,12 @@
   "private": true,
   "description": "Hexagonal chess engine in Rust with TypeScript frontend",
   "scripts": {
-    "build:engine": "cd engine && wasm-pack build --target web --release",
-    "build:frontend": "cd frontend && npm run build",
+    "build:engine": "wasm-pack build engine --target web --release",
+    "build:engine:dev": "wasm-pack build engine --target web --dev",
+    "build:frontend": "cd frontend && quasar build",
     "build": "npm run build:engine && npm run build:frontend",
-    "dev": "npm run build:engine && cd frontend && npm run dev",
-    "dev:watch": "npm run build:engine -- --watch && cd frontend && npm run dev",
-    "clean": "cd engine && wasm-pack clean && cd frontend && rm -rf dist .quasar node_modules"
+    "dev": "npm run build:engine:dev && cd frontend && quasar dev",
+    "clean": "cargo clean && rm -rf engine/pkg frontend/dist frontend/.quasar"
   },
   "keywords": ["hexagonal chess", "wasm", "rust"],
   "author": "Christian Langen",

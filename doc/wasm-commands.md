@@ -57,13 +57,39 @@ it is the contract the frontend compiles against.
 
 ## Gotchas
 
-- `wasm-pack clean` and `wasm-pack build --watch` **do not exist** — the `clean`
-  and `dev:watch` scripts in the root `package.json` will fail. Use `cargo clean`
-  and `rm -rf engine/pkg`. For a watch loop:
+- `wasm-pack clean` and `wasm-pack build --watch` **do not exist**. Use
+  `cargo clean` and `rm -rf engine/pkg`, which is what `npm run clean` does. For
+  a watch loop:
   `cargo watch -w engine/src -s 'wasm-pack build engine --target web --dev'`.
 - `engine/pkg/` is generated and self-ignoring. Never edit it, never commit it.
 - Panics abort. Add `console_error_panic_hook` for real stack traces in the browser.
 - `--release` build time is mostly `wasm-opt`. Use `--dev` while iterating.
+
+## IDE: only one target at a time
+
+rust-analyzer analyzes for exactly one target. On the host default,
+`#[cfg(target_family = "wasm")] pub mod wasm;` in [engine/src/lib.rs](../engine/src/lib.rs)
+is false, so `wasm.rs` is not in the module tree — no goto-definition, no
+completion, no hover, and the file shows dimmed. [.vscode/settings.json](../.vscode/settings.json)
+therefore sets:
+
+```jsonc
+"rust-analyzer.cargo.target": "wasm32-unknown-unknown",
+```
+
+That costs the reverse: `display.rs`, `bin/main.rs` and the `use crate::display::…`
+in lib.rs's test module go unresolved. **Comment the line out and save** to
+analyze the native side again; rust-analyzer watches this setting and re-indexes
+on its own (a few seconds — goto-definition is unreliable until it settles). If
+it doesn't react, `Ctrl+Shift+P` → *rust-analyzer: Restart Server*.
+
+Whichever side is dimmed is the one currently cfg'd out. Only the IDE is
+affected — `cargo` and `wasm-pack` each pass their own `--target` and are
+unaffected by this setting.
+
+The permanent fix would be gating `mod wasm` on a cargo feature instead of the
+target, so both modules analyze at once; it costs `-- --features wasm` on every
+wasm-pack call, which is why the toggle is here instead.
 
 ## Documentation
 
