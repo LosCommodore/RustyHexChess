@@ -3,11 +3,10 @@
 use std::{error::Error, marker};
 
 use engine::{
-    Game, NextTurn, Side,
+    Game, Side,
     board::Board,
     coordinates::Position,
     display::{self, save_board_to_html_file, write_html},
-    new_game,
     piece::{Piece, PieceType, get_startup_pieces_black, get_startup_pieces_white},
 };
 
@@ -30,15 +29,10 @@ fn find_output_directory() -> PathBuf {
 
 fn main() -> Result<()> {
     ChessTerminal::clc()?;
-    let mut game = new_game(None);
+    let mut game = Game::new(None);
     let terminal = ChessTerminal;
 
-    let NextTurn::Continued(mut game) = game
-        .make_human_move(('B', 5), ('B', 6))
-        .map_err(|e| e.error)?
-    else {
-        panic!("??")
-    };
+    game.make_human_move(('B', 5), ('B', 6))?;
 
     let mv_options = game.get_movement_options(Position::from_human(('B', 6)).unwrap())?;
     let markers = mv_options.iter().map(|x| x.destination).collect();

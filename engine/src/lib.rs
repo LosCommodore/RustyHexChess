@@ -39,21 +39,9 @@ pub enum UserError {
 
     #[error("There is no move to undo")]
     CannotUndo,
-}
 
-#[derive(Debug)]
-pub struct GameError<G> {
-    pub game: G,
-    pub error: UserError,
-}
-
-impl<G> GameError<G> {
-    fn new(game: G, error: impl Into<UserError>) -> Self {
-        Self {
-            game,
-            error: error.into(),
-        }
-    }
+    #[error("The function cannot be executed in this game state. Game is currently in State: ")]
+    WrongGameState(GameState),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, EnumIter, Serialize)]
@@ -63,12 +51,23 @@ pub enum Side {
     Black,
 }
 
+#[derive(Copy, Default, Debug, Clone, Serialize)]
+
+pub enum GameState {
+    #[default]
+    Normal,
+    Promotion,
+    GameOver {
+        winner: Option<Side>,
+    },
+}
+
 #[derive(Default, Debug, Clone, Serialize)]
-pub struct Game<T> {
+pub struct Game {
     board: Board,
     active_side: Side,
     moves: Vec<GameMove>,
-    _state: T,
+    state: GameState,
 }
 
 #[derive(Debug, Serialize)]
@@ -79,16 +78,6 @@ pub struct GameOver {
     winner: Side,
 }
 
-#[derive(Debug, Serialize)]
-pub struct PromotePawn;
-
-#[derive(Debug)]
-pub enum NextTurn {
-    Continued(Game<NormalTurn>),
-    PromotionRequired(Game<PromotePawn>),
-    GameOver(Game<GameOver>),
-}
-
 #[derive(PartialEq, Eq, Debug)]
 pub enum KingState {
     Nothing,
@@ -96,45 +85,22 @@ pub enum KingState {
     Mate,
 }
 
-pub type GameResult<Game> = std::result::Result<NextTurn, GameError<Game>>;
 pub type Result<T> = std::result::Result<T, UserError>;
 
-pub fn new_game(board: Option<Board>) -> Game<NormalTurn> {
-    let board = board.unwrap_or_else(|| {
-        let mut board = Board::default();
-        board.pieces.extend(get_startup_pieces_white());
-        board.pieces.extend(get_startup_pieces_black());
-        board
-    });
+impl Game {
+    pub fn new(board: Option<Board>) -> Self {
+        let board = board.unwrap_or_else(|| {
+            let mut board = Board::default();
+            board.pieces.extend(get_startup_pieces_white());
+            board.pieces.extend(get_startup_pieces_black());
+            board
+        });
 
-    Game {
-        board,
-        active_side: Side::White,
-        moves: Vec::new(),
-        _state: NormalTurn,
-    }
-}
-
-impl<T> Game<T> {
-    pub fn transition<N>(self, new_state: N) -> Game<N> {
         Game {
-            board: self.board,
-            active_side: self.active_side,
-            moves: self.moves,
-            _state: new_state,
-        }
-    }
-
-    fn undo_next_turn(self, mv: GameMove) -> NextTurn {
-        match mv {
-            GameMove {
-                action: Action::Capture { .. } | Action::Move,
-                ..
-            } => NextTurn::Continued(self.transition(NormalTurn)),
-            GameMove {
-                action: Action::Promote { .. },
-                ..
-            } => NextTurn::PromotionRequired(self.transition(PromotePawn)),
+            board,
+            active_side: Side::White,
+            moves: Vec::new(),
+            state: GameState::Normal,
         }
     }
 
@@ -224,7 +190,7 @@ impl<T> Game<T> {
         Ok(mv)
     }
 
-    fn get_en_passant_moves(&self) -> Vec<GameMove> {
+    fn get_en_passant_moves(&mut self) -> Vec<GameMove> {
         // -- check if last move enables a potential en passant
         let Some(last) = self.moves.last() else {
             return Vec::new();
@@ -285,52 +251,30 @@ impl<T> Game<T> {
         moves
     }
 
-    fn next_turn(mut self) -> NextTurn {
-        let current_player = self.active_side;
+    fn next_turn(&mut self) {
         self.active_side = !self.active_side;
 
-        match self.check_king() {
-            KingState::Check { .. } | KingState::Nothing => {
-                NextTurn::Continued(self.transition(NormalTurn))
+        if matches!(self.check_king(), KingState::Mate) {
+            self.state = GameState::GameOver {
+                winner: Some(!self.active_side),
             }
-            KingState::Mate => NextTurn::GameOver(self.transition(GameOver {
-                winner: current_player,
-            })),
         }
     }
-}
 
-impl Game<NormalTurn> {
     /// Sets who moves first. Only meaningful before any move has been played,
     /// i.e. when a game starts from a position that was set up by hand.
-    pub fn with_active_side(mut self, side: Side) -> Self {
+    pub fn with_active_side(&mut self, side: Side) {
         self.active_side = side;
-        self
     }
 
     // Make a move using human coordinates
     pub fn make_human_move(
-        self,
+        &mut self,
         origin: HumanNotation,
         destination: HumanNotation,
-    ) -> GameResult<Self> {
-        let origin = match Position::from_human(origin) {
-            Ok(x) => x,
-            Err(e) => {
-                return Err(GameError::new(self, e));
-            }
-        };
-
-        let destination = match Position::from_human(destination) {
-            Ok(x) => x,
-            Err(e) => {
-                return Err(GameError {
-                    game: self,
-                    error: e.into(),
-                });
-            }
-        };
-
+    ) -> Result<()> {
+        let origin = Position::from_human(origin)?;
+        let destination = Position::from_human(destination)?;
         self.make_move(origin, destination)
     }
 
@@ -357,11 +301,11 @@ impl Game<NormalTurn> {
     }
 
     /// Make a move on the board. Move must be valid, otherwise an error will be returned
-    pub fn make_move(mut self, origin: Position, destination: Position) -> GameResult<Self> {
-        let game_move = match self.validate_move(origin, destination) {
-            Ok(game_move) => game_move,
-            Err(e) => return Err(GameError::new(self, e)),
-        };
+    pub fn make_move(&mut self, origin: Position, destination: Position) -> Result<()> {
+        if !matches!(self.state, GameState::Normal) {
+            return Err(UserError::WrongGameState(self.state));
+        }
+        let game_move = self.validate_move(origin, destination)?;
 
         // -- Normal move logic
         self.board.execute(&game_move);
@@ -374,9 +318,8 @@ impl Game<NormalTurn> {
                 Side::White => &WHITE_PAWNS_PROMOTION_POSITIONS,
             };
 
-            let is_promotion = promotion_fields.contains(&destination);
-            if is_promotion {
-                return Ok(NextTurn::PromotionRequired(self.transition(PromotePawn)));
+            if promotion_fields.contains(&destination) {
+                self.state = GameState::Promotion;
             }
         }
 
@@ -384,32 +327,26 @@ impl Game<NormalTurn> {
     }
 
     // Undo the last game move
-    pub fn undo(mut self) -> GameResult<Self> {
+    pub fn undo(&mut self) -> Result<()> {
         let Some(mv) = self.moves.pop() else {
-            return Err(GameError {
-                game: self,
-                error: UserError::CannotUndo,
-            });
+            return Err(UserError::CannotUndo);
         };
 
         self.board.undo(&mv);
         self.active_side = !self.active_side;
-        Ok(self.undo_next_turn(mv))
-    }
-}
 
-impl Game<GameOver> {
-    pub fn winner(&self) -> Side {
-        self._state.winner
+        Ok(())
     }
-}
 
-impl Game<PromotePawn> {
-    pub fn promote(mut self, piece_type: PieceType) -> GameResult<Self> {
+    pub fn promote(&mut self, piece_type: PieceType) -> Result<()> {
+        if !matches!(self.state, GameState::Promotion) {
+            return Err(UserError::WrongGameState(self.state));
+        }
+
         let destination = self
             .moves
             .last()
-            .expect("promotion without history?")
+            .expect("promotion without history ???")
             .destination;
 
         let new_piece = Piece {
@@ -424,19 +361,9 @@ impl Game<PromotePawn> {
             destination,
             action: Action::Promote { to: new_piece },
         });
-        Ok(self.next_turn())
-    }
 
-    pub fn undo(mut self) -> GameResult<Self> {
-        let Some(mv) = self.moves.pop() else {
-            return Err(GameError {
-                game: self,
-                error: UserError::CannotUndo,
-            });
-        };
-
-        self.board.undo(&mv);
-        Ok(self.undo_next_turn(mv))
+        self.state = GameState::Normal;
+        Ok(())
     }
 }
 
@@ -809,7 +736,7 @@ mod tests {
         let human = Position::from_human;
 
         let board = Board::default();
-        let mut game = new_game(Some(board));
+        let mut game = Game::new(Some(board));
 
         let white_rook_pos = human(('I', 4)).unwrap();
         game.board
