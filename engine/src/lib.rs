@@ -1,4 +1,4 @@
-pub mod api;
+//pub mod api;
 pub mod board;
 pub mod coordinates;
 mod movement;
@@ -40,7 +40,9 @@ pub enum UserError {
     #[error("There is no move to undo")]
     CannotUndo,
 
-    #[error("The function cannot be executed in this game state. Game is currently in State: ")]
+    #[error(
+        "The function cannot be executed in this game state. Game is currently in state: {0:?}"
+    )]
     WrongGameState(GameState),
 }
 
@@ -68,14 +70,6 @@ pub struct Game {
     active_side: Side,
     moves: Vec<GameMove>,
     state: GameState,
-}
-
-#[derive(Debug, Serialize)]
-pub struct NormalTurn;
-
-#[derive(Debug, Serialize)]
-pub struct GameOver {
-    winner: Side,
 }
 
 #[derive(PartialEq, Eq, Debug)]
@@ -110,6 +104,17 @@ impl Game {
 
     pub fn active_side(&self) -> Side {
         self.active_side
+    }
+
+    /// The winning side. `None` is a draw (remis).
+    ///
+    /// Errors while the game is still running, so that "nobody won" and
+    /// "nobody has won *yet*" stay distinguishable.
+    pub fn winner(&self) -> Result<Option<Side>> {
+        match self.state {
+            GameState::GameOver { winner } => Ok(winner),
+            state => Err(UserError::WrongGameState(state)),
+        }
     }
 
     /// The moves played so far, oldest first. A promotion appears as its own
@@ -319,11 +324,15 @@ impl Game {
             };
 
             if promotion_fields.contains(&destination) {
+                // The mover stays on turn until they pick a piece; `promote`
+                // ends the turn for them.
                 self.state = GameState::Promotion;
+                return Ok(());
             }
         }
 
-        Ok(self.next_turn())
+        self.next_turn();
+        Ok(())
     }
 
     // Undo the last game move
@@ -333,7 +342,14 @@ impl Game {
         };
 
         self.board.undo(&mv);
-        self.active_side = !self.active_side;
+
+        // Whoever played the undone move is on turn again. For a promotion that
+        // is the pawn's side, since `promote` records the pawn as the moved piece.
+        self.active_side = mv.piece.side;
+        self.state = match mv.action {
+            Action::Promote { .. } => GameState::Promotion,
+            Action::Move | Action::Capture { .. } => GameState::Normal,
+        };
 
         Ok(())
     }
@@ -363,6 +379,7 @@ impl Game {
         });
 
         self.state = GameState::Normal;
+        self.next_turn();
         Ok(())
     }
 }
@@ -382,8 +399,7 @@ impl Not for Side {
 mod tests {
     use super::*;
     use crate::display::save_board_to_html_file;
-    use anyhow::{Result, bail};
-    use core::panic;
+    use anyhow::Result;
     use std::{collections::HashSet, path::PathBuf};
 
     fn get_html_repr_path(snapshot_name: &str) -> PathBuf {
@@ -399,7 +415,7 @@ mod tests {
         save_board_to_html_file(board, markers, path).expect("html could not be generated");
     }
 
-    fn mark_and_snap(game: &mut Game<NormalTurn>, positions: &[Position], snapshot_name: &str) {
+    fn mark_and_snap(game: &mut Game, positions: &[Position], snapshot_name: &str) {
         let mut options = Vec::new();
 
         for p in positions {
@@ -445,40 +461,34 @@ mod tests {
                 side: Side::White,
             },
         );
-        let game = new_game(Some(board));
+        let mut game = Game::new(Some(board));
 
         // -- Move pawn
-        let game_result = game.make_move(origin, destination);
+        game.make_move(origin, destination)
+            .expect("Error while playing move");
+
+        // -- The mover stays on turn until the piece is picked
+        assert!(matches!(game.state, GameState::Promotion));
+        assert_eq!(game.active_side(), Side::White);
 
         // -- Promote
-        let game = match game_result.expect("Error while playing move") {
-            NextTurn::PromotionRequired(game) => game,
-            _ => panic!("Wrong game state"),
-        };
+        game.promote(PieceType::Queen)
+            .expect("Error while promoting");
 
         // -- Check normal game state again
-        let NextTurn::Continued(game) = game
-            .promote(PieceType::Queen)
-            .expect("Error while promoting")
-        else {
-            panic!("Should be again normal game")
-        };
+        assert!(matches!(game.state, GameState::Normal));
+        assert_eq!(game.active_side(), Side::Black);
 
-        // -- Check Queen exists
-        assert!(
-            game.board()
-                .pieces
-                .get(&destination)
-                .expect("no piece ??")
-                .piece_type
-                == PieceType::Queen
-        );
+        // -- Check Queen exists, and belongs to the player that promoted
+        let promoted = game.board().pieces.get(&destination).expect("no piece ??");
+        assert_eq!(promoted.piece_type, PieceType::Queen);
+        assert_eq!(promoted.side, Side::White);
         println!("{game:#?}");
     }
 
     #[test]
     fn test_serde_json() -> Result<()> {
-        let game = new_game(None);
+        let game = Game::new(None);
         serde_json::to_string(&game)?;
         Ok(())
     }
@@ -502,7 +512,7 @@ mod tests {
             },
         );
 
-        let mut game = new_game(Some(board));
+        let mut game = Game::new(Some(board));
 
         let is_check = game.king_in_check(Side::White);
         assert!(!is_check, "expected no check here 1");
@@ -569,51 +579,45 @@ mod tests {
         );
 
         // White pawn takes Bishop
-        let game = new_game(Some(board));
+        let mut game = Game::new(Some(board));
         let mut game_states = Vec::new();
         game_states.push(serde_json::to_string(&game)?);
 
-        let NextTurn::Continued(game) = game
-            .make_move(origin, Position::from_human(('G', 9)).unwrap())
-            .map_err(|e| e.error)?
-        else {
-            bail!("wrong game state 1")
-        };
+        game.make_move(origin, Position::from_human(('G', 9)).unwrap())?;
+        assert!(
+            matches!(game.state, GameState::Normal),
+            "wrong game state 1"
+        );
         game_states.push(serde_json::to_string(&game)?);
 
         // Black King moves
-        let NextTurn::Continued(game) = game
-            .make_human_move(('I', 2), ('I', 3))
-            .map_err(|e| e.error)?
-        else {
-            bail!("Wrong game state 2")
-        };
+        game.make_human_move(('I', 2), ('I', 3))?;
+        assert!(
+            matches!(game.state, GameState::Normal),
+            "wrong game state 2"
+        );
         let last_state = serde_json::to_string(&game)?;
 
-        // White Pawn moves
-        let NextTurn::PromotionRequired(game) = game
-            .make_human_move(('G', 9), ('G', 10))
-            .map_err(|e| e.error)?
-        else {
-            bail!("Wrong game state 3")
-        };
+        // White Pawn moves onto the promotion rank
+        game.make_human_move(('G', 9), ('G', 10))?;
+        assert!(
+            matches!(game.state, GameState::Promotion),
+            "wrong game state 3"
+        );
 
         println!("undoing move {:?}", game.moves.last());
-        let NextTurn::Continued(mut game) = game.undo().map_err(|e| e.error)? else {
-            bail!("wrong state while undoing")
-        };
+        game.undo()?;
         let new_state = serde_json::to_string(&game)?;
         assert_eq!(new_state, last_state, "game state not identical");
 
         for game_state in game_states.into_iter().rev() {
             println!("undoing move {:?}", game.moves.last());
-            let NextTurn::Continued(next_game) = game.undo().map_err(|e| e.error)? else {
-                bail!("wrong state while undoing")
-            };
-            game = next_game;
+            game.undo()?;
             let new_state = serde_json::to_string(&game)?;
             assert_eq!(new_state, game_state, "game state not identical");
         }
+
+        assert!(game.undo().is_err(), "nothing left to undo");
         Ok(())
     }
 
@@ -624,7 +628,7 @@ mod tests {
         let human = Position::from_human;
 
         let board = Board::default();
-        let mut game = new_game(Some(board));
+        let mut game = Game::new(Some(board));
 
         game.board
             .pieces
@@ -662,13 +666,20 @@ mod tests {
             .insert(human(('I', 1)).unwrap(), Piece::new(Rook, Black));
 
         game.active_side = Side::Black;
-        let mut game = match game
-            .make_human_move(('I', 1), ('H', 1))
-            .expect("move error ?")
-        {
-            NextTurn::GameOver(game) => game,
-            _ => panic!("should be game over"),
-        };
+        game.make_human_move(('I', 1), ('H', 1))
+            .expect("move error ?");
+
+        assert!(
+            matches!(game.state, GameState::GameOver { .. }),
+            "should be game over"
+        );
+        assert_eq!(game.winner().expect("game is over"), Some(Side::Black));
+
+        // A finished game rejects further moves
+        assert!(matches!(
+            game.make_human_move(('H', 1), ('I', 1)),
+            Err(UserError::WrongGameState(_))
+        ));
 
         game.board
             .pieces
@@ -684,7 +695,7 @@ mod tests {
         let human = Position::from_human;
 
         let board = Board::default();
-        let mut game = new_game(Some(board));
+        let mut game = Game::new(Some(board));
         let white_pawn_origin = human(('J', 1)).unwrap();
         let white_pawn_destination = human(('J', 3)).unwrap();
         let black_pawn_origin = human(('I', 3)).unwrap();
@@ -705,26 +716,13 @@ mod tests {
             .pieces
             .insert(black_pawn_origin, Piece::new(Pawn, Black));
 
-        let NextTurn::Continued(mut game) = game
-            .make_move(white_pawn_origin, white_pawn_destination)
-            .map_err(|e| e.error)?
-        else {
-            panic!("invalid game state")
-        };
-
+        game.make_move(white_pawn_origin, white_pawn_destination)?;
         mark_and_snap(&mut game, &[black_pawn_origin], "test_en_passant");
 
-        let NextTurn::Continued(mut game) = game
-            .make_move(black_pawn_origin, human(('j', 2)).unwrap())
-            .map_err(|e| e.error)?
-        else {
-            panic!("invalid game state")
-        };
+        game.make_move(black_pawn_origin, human(('j', 2)).unwrap())?;
         mark_and_snap(&mut game, &[], "test_en_passant_2");
 
-        let NextTurn::Continued(mut game) = game.undo().map_err(|e| e.error)? else {
-            panic!("invalid game state")
-        };
+        game.undo()?;
         mark_and_snap(&mut game, &[], "test_en_passant_3");
         Ok(())
     }
