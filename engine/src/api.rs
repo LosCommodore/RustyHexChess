@@ -1,9 +1,8 @@
 //! The engine's outward-facing API: one mutable handle, plain data in and out.
 //!
-//! This layer exists so that callers — the WASM frontend today, a training loop
-//! later — never touch the type-state `Game<T>` machinery, whose transitions
-//! consume `self` and are awkward to hold across a foreign function boundary.
-//! [`GameApi`] owns the game, applies commands to it, and hands back snapshots.
+//! This layer translates. [`GameApi`] owns a [`Game`], applies commands to it,
+//! and hands back snapshots — the caller never deals with [`Position`],
+//! [`Side`] or [`UserError`].
 //!
 //! The wire types here are deliberately *not* the engine's own types. They use
 //! their own spelling (lowercase names, `"f5"` squares) so the engine stays free
@@ -15,22 +14,24 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 use crate::{
-    Game, GameError, GameOver, NextTurn, NormalTurn, PromotePawn, Side, UserError,
+    Game, GameState as EngineState, Side, UserError,
     board::{Action, Board, GameMove, MoveError},
     coordinates::{CoordinateError, Position},
-    new_game,
     piece::{Piece, PieceType},
 };
 
 // --- Wire types ---------------------------------------------------------
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(target_family = "wasm", derive(tsify::Tsify))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, strum::Display)]
 #[serde(rename_all = "lowercase")]
+#[strum(serialize_all = "lowercase")]
 pub enum Color {
     White,
     Black,
 }
 
+#[cfg_attr(target_family = "wasm", derive(tsify::Tsify))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Kind {
@@ -43,6 +44,7 @@ pub enum Kind {
 }
 
 /// Which command the game will accept next.
+#[cfg_attr(target_family = "wasm", derive(tsify::Tsify))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Phase {
@@ -54,10 +56,32 @@ pub enum Phase {
     Finished,
 }
 
+impl Phase {
+    /// How this phase reads in the [`ApiError::WrongPhase`] message.
+    fn label(self) -> &'static str {
+        match self {
+            Phase::Normal => "a move",
+            Phase::Promotion => "a promotion",
+            Phase::Finished => "nothing, the game is over",
+        }
+    }
+}
+
+impl From<EngineState> for Phase {
+    fn from(state: EngineState) -> Self {
+        match state {
+            EngineState::Normal => Phase::Normal,
+            EngineState::Promotion => Phase::Promotion,
+            EngineState::GameOver { .. } => Phase::Finished,
+        }
+    }
+}
+
 /// What a move does, beyond vacating its origin.
 ///
 /// `Capture.square` is the square the taken piece stood on, which for en passant
 /// is *not* the destination — the UI needs both to draw the capture correctly.
+#[cfg_attr(target_family = "wasm", derive(tsify::Tsify))]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum MoveAction {
@@ -72,6 +96,7 @@ pub enum MoveAction {
     },
 }
 
+#[cfg_attr(target_family = "wasm", derive(tsify::Tsify))]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PlacedPiece {
     pub square: String,
@@ -80,6 +105,7 @@ pub struct PlacedPiece {
 }
 
 /// One move that was played, as the move list wants to render it.
+#[cfg_attr(target_family = "wasm", derive(tsify::Tsify))]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PlayedMove {
@@ -93,12 +119,14 @@ pub struct PlayedMove {
 }
 
 /// A destination the selected piece may legally reach.
+#[cfg_attr(target_family = "wasm", derive(tsify::Tsify))]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LegalMove {
     pub to: String,
     pub action: MoveAction,
 }
 
+#[cfg_attr(target_family = "wasm", derive(tsify::Tsify))]
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Captured {
     /// Pieces taken *by* white.
@@ -109,6 +137,7 @@ pub struct Captured {
 
 /// A complete snapshot of the game. Every command returns one of these, so the
 /// caller can render from it without tracking state of its own.
+#[cfg_attr(target_family = "wasm", derive(tsify::Tsify))]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GameState {
@@ -129,6 +158,29 @@ pub struct GameState {
 
 // --- Errors -------------------------------------------------------------
 
+/// The stable half of an [`ApiError`] — what a caller branches on, as opposed
+/// to the message, which is for humans and may be reworded.
+///
+/// The TypeScript union is generated from this, so adding a variant cannot
+/// leave `engine.d.ts` behind.
+#[cfg_attr(target_family = "wasm", derive(tsify::Tsify))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, strum::IntoStaticStr)]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
+pub enum ErrorCode {
+    InvalidSquare,
+    NoPieceAtSquare,
+    InvalidPieceType,
+    InvalidColor,
+    WrongPlayer,
+    IllegalMove,
+    CannotUndo,
+    WrongPhase,
+    MissingKing,
+    DuplicateSquare,
+    Engine,
+}
+
 /// Everything that can go wrong, as a value the caller can branch on. `code` is
 /// the stable part; `message` is for humans and may be reworded.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -142,6 +194,9 @@ pub enum ApiError {
     #[error("'{name}' is not a piece type")]
     InvalidPieceType { name: String },
 
+    #[error("'{name}' is not a colour")]
+    InvalidColor { name: String },
+
     #[error("that piece belongs to the other player")]
     WrongPlayer,
 
@@ -151,6 +206,7 @@ pub enum ApiError {
     #[error("there is no move to undo")]
     CannotUndo,
 
+    /// `expected` is what the game is waiting for, `actual` what was sent.
     #[error("the game is waiting for {expected}, not {actual}")]
     WrongPhase {
         expected: &'static str,
@@ -163,43 +219,43 @@ pub enum ApiError {
     #[error("two pieces were placed on {square}")]
     DuplicateSquare { square: String },
 
-    #[error("the game was left in an unusable state by an earlier failure")]
-    Poisoned,
-
     #[error("{message}")]
     Engine { message: String },
 }
 
 impl ApiError {
     /// Stable identifier for callers that need to react to a specific failure.
-    pub fn code(&self) -> &'static str {
+    pub fn code(&self) -> ErrorCode {
         match self {
-            Self::InvalidSquare { .. } => "invalid_square",
-            Self::NoPieceAtSquare { .. } => "no_piece_at_square",
-            Self::InvalidPieceType { .. } => "invalid_piece_type",
-            Self::WrongPlayer => "wrong_player",
-            Self::IllegalMove => "illegal_move",
-            Self::CannotUndo => "cannot_undo",
-            Self::WrongPhase { .. } => "wrong_phase",
-            Self::MissingKing { .. } => "missing_king",
-            Self::DuplicateSquare { .. } => "duplicate_square",
-            Self::Poisoned => "poisoned",
-            Self::Engine { .. } => "engine",
+            Self::InvalidSquare { .. } => ErrorCode::InvalidSquare,
+            Self::NoPieceAtSquare { .. } => ErrorCode::NoPieceAtSquare,
+            Self::InvalidPieceType { .. } => ErrorCode::InvalidPieceType,
+            Self::InvalidColor { .. } => ErrorCode::InvalidColor,
+            Self::WrongPlayer => ErrorCode::WrongPlayer,
+            Self::IllegalMove => ErrorCode::IllegalMove,
+            Self::CannotUndo => ErrorCode::CannotUndo,
+            Self::WrongPhase { .. } => ErrorCode::WrongPhase,
+            Self::MissingKing { .. } => ErrorCode::MissingKing,
+            Self::DuplicateSquare { .. } => ErrorCode::DuplicateSquare,
+            Self::Engine { .. } => ErrorCode::Engine,
         }
     }
 }
 
 /// The serialized form of an [`ApiError`]: `{"code": "...", "message": "..."}`.
+///
+/// Not a wire type — `wasm.rs` unpacks it into a thrown JS `Error`, which the
+/// hand-written `HexChessError` describes.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApiErrorDto {
-    pub code: String,
+    pub code: ErrorCode,
     pub message: String,
 }
 
 impl From<&ApiError> for ApiErrorDto {
     fn from(error: &ApiError) -> Self {
         Self {
-            code: error.code().to_string(),
+            code: error.code(),
             message: error.to_string(),
         }
     }
@@ -215,6 +271,12 @@ impl From<UserError> for ApiError {
                 square: square_name(pos),
             },
             UserError::CoordinateError(e) => Self::from(e),
+            // Unreachable through [`GameApi`], which checks the phase before it
+            // calls the engine — but it must not degrade to `code: "engine"`.
+            UserError::WrongGameState(state) => Self::WrongPhase {
+                expected: Phase::from(state).label(),
+                actual: "that command",
+            },
             other => Self::Engine {
                 message: other.to_string(),
             },
@@ -265,15 +327,6 @@ pub fn square_name(pos: Position) -> String {
 }
 
 // --- Conversions --------------------------------------------------------
-
-impl std::fmt::Display for Color {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(match self {
-            Color::White => "white",
-            Color::Black => "black",
-        })
-    }
-}
 
 impl From<Side> for Color {
     fn from(side: Side) -> Self {
@@ -344,7 +397,7 @@ impl std::str::FromStr for Color {
         match name.to_ascii_lowercase().as_str() {
             "white" => Ok(Color::White),
             "black" => Ok(Color::Black),
-            _ => Err(ApiError::InvalidPieceType {
+            _ => Err(ApiError::InvalidColor {
                 name: name.to_string(),
             }),
         }
@@ -369,49 +422,12 @@ impl From<&Action> for MoveAction {
 
 // --- The handle ---------------------------------------------------------
 
-/// The three type-states, erased into one value the caller can hold onto.
-#[derive(Debug)]
-enum Stage {
-    Normal(Game<NormalTurn>),
-    Promotion(Game<PromotePawn>),
-    Finished(Game<GameOver>),
-}
-
-impl Stage {
-    fn phase(&self) -> Phase {
-        match self {
-            Stage::Normal(_) => Phase::Normal,
-            Stage::Promotion(_) => Phase::Promotion,
-            Stage::Finished(_) => Phase::Finished,
-        }
-    }
-
-    fn label(&self) -> &'static str {
-        match self {
-            Stage::Normal(_) => "a move",
-            Stage::Promotion(_) => "a promotion",
-            Stage::Finished(_) => "nothing, the game is over",
-        }
-    }
-}
-
-impl From<NextTurn> for Stage {
-    fn from(next: NextTurn) -> Self {
-        match next {
-            NextTurn::Continued(game) => Stage::Normal(game),
-            NextTurn::PromotionRequired(game) => Stage::Promotion(game),
-            NextTurn::GameOver(game) => Stage::Finished(game),
-        }
-    }
-}
-
 /// A playable game. Commands mutate it in place and return the resulting state;
-/// a rejected command leaves the game exactly as it was.
+/// a rejected command leaves the game exactly as it was, because a command that
+/// fails its phase check or its validation never reaches the board.
 #[derive(Debug)]
 pub struct GameApi {
-    /// `None` only between taking the game out to transition it and putting the
-    /// result back, so it is observable only if a transition panicked.
-    stage: Option<Stage>,
+    game: Game,
 }
 
 impl Default for GameApi {
@@ -424,7 +440,7 @@ impl GameApi {
     /// A new game from the standard starting position, white to move.
     pub fn new() -> Self {
         Self {
-            stage: Some(Stage::Normal(new_game(None))),
+            game: Game::new(None),
         }
     }
 
@@ -447,11 +463,9 @@ impl GameApi {
         let board = Board { pieces: board };
         require_kings(&board)?;
 
-        Ok(Self {
-            stage: Some(Stage::Normal(
-                new_game(Some(board)).with_active_side(active.into()),
-            )),
-        })
+        let mut game = Game::new(Some(board));
+        game.with_active_side(active.into());
+        Ok(Self { game })
     }
 
     /// Discards the game and starts over from the standard position.
@@ -459,23 +473,30 @@ impl GameApi {
         *self = Self::new();
     }
 
-    pub fn phase(&self) -> Result<Phase> {
-        self.stage
-            .as_ref()
-            .map(Stage::phase)
-            .ok_or(ApiError::Poisoned)
+    pub fn phase(&self) -> Phase {
+        self.game.state().into()
+    }
+
+    /// Rejects a command the current phase does not accept. `attempted` names
+    /// what was sent, for the message.
+    fn require_phase(&self, needed: Phase, attempted: &'static str) -> Result<()> {
+        let actual = self.phase();
+        if actual == needed {
+            return Ok(());
+        }
+
+        Err(ApiError::WrongPhase {
+            expected: actual.label(),
+            actual: attempted,
+        })
     }
 
     /// The current position, in full.
+    ///
+    /// Infallible today; it stays a `Result` because it is what every command
+    /// returns, and those can fail.
     pub fn state(&mut self) -> Result<GameState> {
-        match self.stage.as_mut().ok_or(ApiError::Poisoned)? {
-            Stage::Normal(game) => Ok(snapshot(game, Phase::Normal, None)),
-            Stage::Promotion(game) => Ok(snapshot(game, Phase::Promotion, None)),
-            Stage::Finished(game) => {
-                let winner = game.winner().into();
-                Ok(snapshot(game, Phase::Finished, Some(winner)))
-            }
-        }
+        Ok(snapshot(&mut self.game))
     }
 
     /// Where the piece on `square` may go.
@@ -486,24 +507,23 @@ impl GameApi {
     /// board, and a click on a dead square is not a mistake.
     pub fn legal_moves(&mut self, square: &str) -> Result<Vec<LegalMove>> {
         let pos = parse_square(square)?;
-        let stage = self.stage.as_mut().ok_or(ApiError::Poisoned)?;
-        let Stage::Normal(game) = stage else {
-            return Ok(Vec::new());
-        };
-
-        let Some(piece) = game.board().pieces.get(&pos) else {
-            return Ok(Vec::new());
-        };
-        if piece.side != game.active_side() {
+        if self.phase() != Phase::Normal {
             return Ok(Vec::new());
         }
-        require_kings(game.board())?;
+
+        let Some(piece) = self.game.board().pieces.get(&pos) else {
+            return Ok(Vec::new());
+        };
+        if piece.side != self.game.active_side() {
+            return Ok(Vec::new());
+        }
+        require_kings(self.game.board())?;
 
         // The generator can offer the same destination twice — a pawn's double
         // step re-emits its single step — and a square the board can only be
         // entered once, so one entry per destination is what a caller wants.
         let mut destinations: Vec<LegalMove> = Vec::new();
-        for mv in game.get_movement_options(pos)? {
+        for mv in self.game.get_movement_options(pos)? {
             let to = square_name(mv.destination);
             let action = MoveAction::from(&mv.action);
 
@@ -525,85 +545,28 @@ impl GameApi {
         let origin = parse_square(from)?;
         let destination = parse_square(to)?;
 
-        let game = self.take_normal()?;
-        if let Err(error) = require_kings(game.board()) {
-            self.stage = Some(Stage::Normal(game));
-            return Err(error);
-        }
+        self.require_phase(Phase::Normal, "a move")?;
+        require_kings(self.game.board())?;
 
-        match game.make_move(origin, destination) {
-            Ok(next) => {
-                self.stage = Some(next.into());
-                self.state()
-            }
-            Err(GameError { game, error }) => {
-                self.stage = Some(Stage::Normal(game));
-                Err(error.into())
-            }
-        }
+        self.game.make_move(origin, destination)?;
+        self.state()
     }
 
     /// Replaces the pawn that just reached the far end.
     pub fn promote(&mut self, kind: Kind) -> Result<GameState> {
-        let game = match self.stage.take() {
-            Some(Stage::Promotion(game)) => game,
-            Some(other) => return Err(self.restore(other, "a promotion")),
-            None => return Err(ApiError::Poisoned),
-        };
+        self.require_phase(Phase::Promotion, "a promotion")?;
 
-        match game.promote(kind.into()) {
-            Ok(next) => {
-                self.stage = Some(next.into());
-                self.state()
-            }
-            Err(GameError { game, error }) => {
-                self.stage = Some(Stage::Promotion(game));
-                Err(error.into())
-            }
-        }
+        self.game.promote(kind.into())?;
+        self.state()
     }
 
     /// Takes back the last move, including the half-move that ended the game.
+    ///
+    /// Accepted in every phase: the engine restores whichever one the undone
+    /// move came from, so a finished game becomes playable again.
     pub fn undo(&mut self) -> Result<GameState> {
-        let result = match self.stage.take() {
-            Some(Stage::Normal(game)) => game.undo().map_err(|e| (Stage::Normal(e.game), e.error)),
-            Some(Stage::Promotion(game)) => {
-                game.undo().map_err(|e| (Stage::Promotion(e.game), e.error))
-            }
-            // A finished game is a normal game whose last move happened to be
-            // mate, so undoing it is the same operation.
-            Some(Stage::Finished(game)) => game
-                .transition(NormalTurn)
-                .undo()
-                .map_err(|e| (Stage::Normal(e.game), e.error)),
-            None => return Err(ApiError::Poisoned),
-        };
-
-        match result {
-            Ok(next) => {
-                self.stage = Some(next.into());
-                self.state()
-            }
-            Err((stage, error)) => {
-                self.stage = Some(stage);
-                Err(error.into())
-            }
-        }
-    }
-
-    fn take_normal(&mut self) -> Result<Game<NormalTurn>> {
-        match self.stage.take() {
-            Some(Stage::Normal(game)) => Ok(game),
-            Some(other) => Err(self.restore(other, "a move")),
-            None => Err(ApiError::Poisoned),
-        }
-    }
-
-    /// Puts a stage back that turned out to be the wrong one to act on.
-    fn restore(&mut self, stage: Stage, expected: &'static str) -> ApiError {
-        let actual = stage.label();
-        self.stage = Some(stage);
-        ApiError::WrongPhase { expected, actual }
+        self.game.undo()?;
+        self.state()
     }
 }
 
@@ -622,7 +585,7 @@ fn require_kings(board: &Board) -> Result<()> {
     Ok(())
 }
 
-fn snapshot<T>(game: &mut Game<T>, phase: Phase, winner: Option<Color>) -> GameState {
+fn snapshot(game: &mut Game) -> GameState {
     let pieces = game
         .board()
         .pieces
@@ -659,8 +622,12 @@ fn snapshot<T>(game: &mut Game<T>, phase: Phase, winner: Option<Color>) -> GameS
     // if that king is gone, so a set-up position without kings reports no check.
     let check = require_kings(game.board()).is_ok() && game.king_in_check(active);
 
+    // `winner` errors while the game is still running, which is exactly the
+    // `None` this field wants.
+    let winner = game.winner().unwrap_or(None).map(Color::from);
+
     GameState {
-        phase,
+        phase: game.state().into(),
         active: active.into(),
         check,
         winner,

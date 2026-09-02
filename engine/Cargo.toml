@@ -21,6 +21,10 @@ crossterm = "0.29.0"
 # native builds and `cargo test` do not pay for them.
 [target.'cfg(target_family = "wasm")'.dependencies]
 js-sys = "0.3"
+# Generates the TypeScript for every wire type in `api.rs`, so `engine.d.ts`
+# cannot drift from the Rust definitions. wasm-only: the derives are applied
+# through `cfg_attr`, so native builds and `cargo test` never see it.
+tsify = "0.5"
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
 web-sys = { version = "0.3", features = ["Window", "Document", "HtmlElement"] }

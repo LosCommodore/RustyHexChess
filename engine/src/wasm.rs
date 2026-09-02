@@ -17,71 +17,20 @@ use wasm_bindgen::prelude::*;
 
 use crate::api::{ApiError, ApiErrorDto, Color, GameApi, Kind, PlacedPiece};
 
-/// The TypeScript that describes the JSON these methods return. wasm-bindgen
-/// copies it verbatim into `engine.d.ts`.
+/// The only TypeScript still written by hand: everything else in `engine.d.ts`
+/// is generated from the `api.rs` types by `tsify`, so it cannot drift.
+///
+/// `Square` is an alias this crate has no Rust type for, and `HexChessError`
+/// describes a thrown JS `Error` rather than a value that crosses the boundary
+/// — but its `code` is `ErrorCode`, which *is* generated.
 #[wasm_bindgen(typescript_custom_section)]
 const TYPES: &'static str = r#"
-export type Color = "white" | "black";
-export type Kind = "king" | "queen" | "rook" | "bishop" | "knight" | "pawn";
-export type Phase = "normal" | "promotion" | "finished";
-
 /** A square in the engine's notation, file a-k and rank 1-11, e.g. "f5". */
 export type Square = string;
 
-export type MoveAction =
-  | { type: "move" }
-  /** `square` is where the taken piece stood, which differs from the
-      destination when the capture is en passant. */
-  | { type: "capture"; piece: Kind; color: Color; square: Square }
-  | { type: "promote"; to: Kind };
-
-export interface PlacedPiece {
-  square: Square;
-  kind: Kind;
-  color: Color;
-}
-
-export interface PlayedMove {
-  from: Square;
-  to: Square;
-  kind: Kind;
-  color: Color;
-  action: MoveAction;
-  notation: string;
-}
-
-export interface LegalMove {
-  to: Square;
-  action: MoveAction;
-}
-
-export interface GameState {
-  phase: Phase;
-  active: Color;
-  check: boolean;
-  winner: Color | null;
-  moveNumber: number;
-  pieces: PlacedPiece[];
-  /** Pieces taken by each side. */
-  captured: { white: Kind[]; black: Kind[] };
-  history: PlayedMove[];
-  canUndo: boolean;
-}
-
 /** Thrown by every failing call; `code` is stable, `message` is for humans. */
 export interface HexChessError extends Error {
-  code:
-    | "invalid_square"
-    | "no_piece_at_square"
-    | "invalid_piece_type"
-    | "wrong_player"
-    | "illegal_move"
-    | "cannot_undo"
-    | "wrong_phase"
-    | "missing_king"
-    | "duplicate_square"
-    | "poisoned"
-    | "engine";
+  code: ErrorCode;
 }
 "#;
 
@@ -207,8 +156,9 @@ fn from_js<T: serde::de::DeserializeOwned>(value: JsValue) -> Result<T, JsValue>
 /// Turns an [`ApiError`] into a JS `Error` that also carries its `code`.
 fn throw(error: ApiError) -> JsValue {
     let dto = ApiErrorDto::from(&error);
+    let code: &'static str = dto.code.into();
     let js_error = js_sys::Error::new(&dto.message);
     js_error.set_name("HexChessError");
-    let _ = js_sys::Reflect::set(&js_error, &"code".into(), &dto.code.into());
+    let _ = js_sys::Reflect::set(&js_error, &"code".into(), &code.into());
     js_error.into()
 }
