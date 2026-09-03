@@ -133,6 +133,29 @@ adding repetition and material checks there makes it worse.
 - [ ] Optional, decide if in scope: clocks and time forfeit; a FEN-equivalent
       position import/export, which would also hand A2 a compact position key.
 
+### D1. Panic policy — prio 2, not yet analysed
+
+Crashing on a broken invariant is the intended policy. What is missing is making
+the *deliberate* panics distinguishable from the unexamined ones.
+
+- [ ] Audit the `expect`/`panic!` sites and convert the ones that assert a
+      structural invariant to `unreachable!` with a message naming the invariant
+      and what enforces it — as done in
+      [`king_in_check`](engine/src/lib.rs#L171). The `??? `-style messages
+      ([lib.rs:99](engine/src/lib.rs#L99), [lib.rs:178](engine/src/lib.rs#L178),
+      [lib.rs:223](engine/src/lib.rs#L223), and others) are the tell: each is
+      either an invariant worth stating or a real error that belongs in
+      `UserError`. Not analysed yet — decide per site.
+- [ ] Panic handling at the wasm boundary. `wasm32-unknown-unknown` builds
+      `panic = "abort"`, so `catch_unwind` is not available and there is no
+      supervisor to restart anything: the module traps, the panic message is lost
+      in the browser, and wasm-bindgen's internal `RefCell`s can be left borrowed
+      so later calls fail with borrow errors instead of the original cause. Add
+      `console_error_panic_hook` so the crash is legible, and decide the recovery
+      unit on the JS side — most likely "this `Game` is dead, construct a fresh
+      one" rather than trying to continue. Keeps the crash-on-bugs policy; just
+      picks the failing unit deliberately.
+
 ---
 
 ## E. Tests

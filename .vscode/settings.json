@@ -12,6 +12,7 @@
   "rust-analyzer.inlayHints.closureReturnTypeHints.enable": "never",
   "rust-analyzer.inlayHints.lifetimeElisionHints.enable": "never",
   "cSpell.words": [
+    "analysed",
     "bindgen",
     "colour",
     "containerpub",
@@ -21,6 +22,7 @@
     "insta",
     "msvc",
     "Perft",
+    "prio",
     "remis",
     "signum",
     "statemachine",
