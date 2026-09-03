@@ -44,6 +44,9 @@ pub enum UserError {
         "The function cannot be executed in this game state. Game is currently in state: {0:?}"
     )]
     WrongGameState(GameState),
+
+    #[error("Promotion to type: {0:?} not allowed")]
+    WrongPromotionType(PieceType),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, EnumIter, Serialize)]
@@ -357,6 +360,10 @@ impl Game {
     }
 
     pub fn promote(&mut self, piece_type: PieceType) -> Result<()> {
+        if matches!(piece_type, PieceType::Pawn | PieceType::King) {
+            return Err(UserError::WrongPromotionType(piece_type));
+        }
+
         if !matches!(self.state, GameState::Promotion) {
             return Err(UserError::WrongGameState(self.state));
         }

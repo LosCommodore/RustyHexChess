@@ -66,12 +66,6 @@ draw, but nothing ever produces one.
 
 ## B. Bugs that block the above — fix first
 
-### B1. `promote` accepts any piece type
-
-[`promote`](engine/src/lib.rs#L359) will happily promote to `King` or `Pawn`.
-
-- [ ] Restrict to Q/R/B/N, with its own error code.
-
 ### B2. `king_in_check` panics on a missing king
 
 [lib.rs:148](engine/src/lib.rs#L148). `GameApi` guards it with `require_kings`,
