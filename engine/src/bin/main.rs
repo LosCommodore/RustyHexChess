@@ -29,7 +29,7 @@ fn find_output_directory() -> PathBuf {
 
 fn main() -> Result<()> {
     ChessTerminal::clc()?;
-    let mut game = Game::new(None);
+    let mut game = Game::new();
     let terminal = ChessTerminal;
 
     game.make_human_move(('B', 5), ('B', 6))?;

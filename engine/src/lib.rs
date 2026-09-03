@@ -1,4 +1,4 @@
-pub mod api;
+// pub mod api;
 pub mod board;
 pub mod coordinates;
 mod movement;
@@ -11,7 +11,10 @@ pub mod display;
 #[cfg(target_family = "wasm")]
 pub mod wasm;
 
-use std::{collections::HashMap, ops::Not};
+use std::{
+    collections::{HashMap, HashSet},
+    ops::Not,
+};
 
 use crate::{
     board::{Action, Board, GameMove, MoveError},
@@ -47,9 +50,12 @@ pub enum UserError {
 
     #[error("Promotion to type: {0:?} not allowed")]
     WrongPromotionType(PieceType),
+
+    #[error("Invalid Board: {0:?}")]
+    InvalidBoard(String),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, EnumIter, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, EnumIter, Serialize, Hash)]
 pub enum Side {
     #[default]
     White,
@@ -67,7 +73,7 @@ pub enum GameState {
     },
 }
 
-#[derive(Default, Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Game {
     board: Board,
     active_side: Side,
@@ -85,20 +91,34 @@ pub enum KingState {
 pub type Result<T> = std::result::Result<T, UserError>;
 
 impl Game {
-    pub fn new(board: Option<Board>) -> Self {
-        let board = board.unwrap_or_else(|| {
-            let mut board = Board::default();
-            board.pieces.extend(get_startup_pieces_white());
-            board.pieces.extend(get_startup_pieces_black());
-            board
-        });
+    pub fn new() -> Self {
+        let mut board = Board::default();
+        board.pieces.extend(get_startup_pieces_white());
+        board.pieces.extend(get_startup_pieces_black());
 
-        Game {
+        return Self::from_board(board).expect("Invalid board ???");
+    }
+
+    pub fn from_board(board: Board) -> Result<Self> {
+        let colors: HashSet<_> = board
+            .pieces
+            .values()
+            .filter(|piece| piece.piece_type == PieceType::King)
+            .map(|piece| piece.side)
+            .collect();
+
+        if colors != HashSet::from([Side::Black, Side::White]) {
+            return Err(UserError::InvalidBoard(
+                "Both Kings must exist on board".into(),
+            ));
+        }
+
+        Ok(Game {
             board,
             active_side: Side::White,
             moves: Vec::new(),
             state: GameState::Normal,
-        }
+        })
     }
 
     pub fn board(&self) -> &Board {
@@ -444,6 +464,7 @@ mod tests {
     fn test_promote_pawn() {
         // -- Create game with pawn
         let mut board = Board::default();
+
         let origin: Position = Position::from_human(('K', 5)).unwrap();
         let destination: Position = Position::from_human(('K', 6)).unwrap();
 
@@ -470,7 +491,7 @@ mod tests {
                 side: Side::White,
             },
         );
-        let mut game = Game::new(Some(board));
+        let mut game = Game::from_board(board).expect("invalid board ??");
 
         // -- Move pawn
         game.make_move(origin, destination)
@@ -497,7 +518,7 @@ mod tests {
 
     #[test]
     fn test_serde_json() -> Result<()> {
-        let game = Game::new(None);
+        let game = Game::new();
         serde_json::to_string(&game)?;
         Ok(())
     }
@@ -521,7 +542,7 @@ mod tests {
             },
         );
 
-        let mut game = Game::new(Some(board));
+        let mut game = Game::from_board(board)?;
 
         let is_check = game.king_in_check(Side::White);
         assert!(!is_check, "expected no check here 1");
@@ -588,7 +609,7 @@ mod tests {
         );
 
         // White pawn takes Bishop
-        let mut game = Game::new(Some(board));
+        let mut game = Game::from_board(board)?;
         let mut game_states = Vec::new();
         game_states.push(serde_json::to_string(&game)?);
 
@@ -636,16 +657,17 @@ mod tests {
         use Side::*;
         let human = Position::from_human;
 
-        let board = Board::default();
-        let mut game = Game::new(Some(board));
+        let mut board = Board::default();
 
-        game.board
+        board
             .pieces
             .insert(human(('F', 5)).unwrap(), Piece::new(King, White));
 
-        game.board
+        board
             .pieces
             .insert(human(('A', 11)).unwrap(), Piece::new(King, Black));
+
+        let mut game = Game::from_board(board).expect("Invalid board ???");
 
         assert_eq!(game.check_king(), KingState::Nothing);
 
@@ -703,19 +725,20 @@ mod tests {
         use Side::*;
         let human = Position::from_human;
 
-        let board = Board::default();
-        let mut game = Game::new(Some(board));
-        let white_pawn_origin = human(('J', 1)).unwrap();
-        let white_pawn_destination = human(('J', 3)).unwrap();
-        let black_pawn_origin = human(('I', 3)).unwrap();
+        let mut board = Board::default();
 
-        game.board
+        board
             .pieces
             .insert(human(('A', 11)).unwrap(), Piece::new(King, White));
 
-        game.board
+        board
             .pieces
             .insert(human(('K', 6)).unwrap(), Piece::new(King, Black));
+
+        let mut game = Game::from_board(board).expect("Invalid Board ??");
+        let white_pawn_origin = human(('J', 1)).unwrap();
+        let white_pawn_destination = human(('J', 3)).unwrap();
+        let black_pawn_origin = human(('I', 3)).unwrap();
 
         game.board
             .pieces
@@ -742,17 +765,19 @@ mod tests {
         use Side::*;
         let human = Position::from_human;
 
-        let board = Board::default();
-        let mut game = Game::new(Some(board));
+        let mut board = Board::default();
 
-        let white_rook_pos = human(('I', 4)).unwrap();
-        game.board
+        board
             .pieces
             .insert(human(('I', 6)).unwrap(), Piece::new(King, White));
 
-        game.board
+        board
             .pieces
             .insert(human(('C', 5)).unwrap(), Piece::new(King, Black));
+
+        let mut game = Game::from_board(board).expect("Invalid board ???");
+
+        let white_rook_pos = human(('I', 4)).unwrap();
 
         game.board
             .pieces
