@@ -3,8 +3,9 @@
 What the engine still owes a complete game of Gliński hexagonal chess. Written
 against the state of `engine/src/` as of this file; line references may drift.
 
-Suggested order: **B → A1 → C1/C2 → A3 → A2 → A4 → C3 → E.**
-A1 is the one that affects real games today.
+Suggested order: **A1 → C1/C2 → A3 → A2 → A4 → C3 → E.**
+A1 is the one that affects real games today. Section B — the bugs that blocked
+everything else — is done and gone.
 
 ---
 
@@ -61,23 +62,6 @@ draw, but nothing ever produces one.
       complex" and the multi-bishop endings do not behave as they do in orthodox
       chess. This is the item most likely to end up silently wrong.
 - [ ] Write the chosen table down in [doc/](doc/) with its reasoning.
-
----
-
-## B. Bugs that block the above — fix first
-
-### B4. `api` is commented out of the build
-
-[`pub mod api;`](engine/src/lib.rs#L1) is disabled, so `GameApi` compiles against
-nothing and its call sites have drifted from the engine.
-
-- [ ] Re-enable the module and fix the stale constructor calls:
-      [api.rs:443](engine/src/api.rs#L443) and
-      [api.rs:466](engine/src/api.rs#L466) still call `Game::new(None)` /
-      `Game::new(Some(board))`, a signature that no longer exists.
-- [ ] Drop [`require_kings`](engine/src/api.rs#L575) in favour of the check now in
-      `Game::from_board`, rather than keeping two implementations. Its four call
-      sites in `api.rs` go with it.
 
 ---
 

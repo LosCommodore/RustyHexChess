@@ -1,4 +1,4 @@
-// pub mod api;
+pub mod api;
 pub mod board;
 pub mod coordinates;
 mod movement;

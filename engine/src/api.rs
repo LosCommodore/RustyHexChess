@@ -439,15 +439,13 @@ impl Default for GameApi {
 impl GameApi {
     /// A new game from the standard starting position, white to move.
     pub fn new() -> Self {
-        Self {
-            game: Game::new(None),
-        }
+        Self { game: Game::new() }
     }
 
     /// A new game from a position that was set up by hand.
     ///
-    /// Both kings must be present: the engine's check detection assumes they
-    /// are, so a board without them would panic on the first move.
+    /// Both kings must be present: [`Game`] takes that as an invariant, so
+    /// [`Game::from_board`] refuses anything else.
     pub fn from_pieces(pieces: &[PlacedPiece], active: Color) -> Result<Self> {
         let mut board = BTreeMap::new();
         for placed in pieces {
@@ -461,9 +459,13 @@ impl GameApi {
         }
 
         let board = Board { pieces: board };
-        require_kings(&board)?;
+        let mut game = Game::from_board(board).map_err(|err| {
+            // `from_board` is the single authority on which boards are playable,
+            // but it reports a missing king as prose. Name the colour, so the
+            // caller gets `MissingKing` rather than a generic engine error.
+            missing_king(pieces).unwrap_or_else(|| ApiError::from(err))
+        })?;
 
-        let mut game = Game::new(Some(board));
         game.with_active_side(active.into());
         Ok(Self { game })
     }
@@ -517,7 +519,6 @@ impl GameApi {
         if piece.side != self.game.active_side() {
             return Ok(Vec::new());
         }
-        require_kings(self.game.board())?;
 
         // The generator can offer the same destination twice — a pawn's double
         // step re-emits its single step — and a square the board can only be
@@ -546,7 +547,6 @@ impl GameApi {
         let destination = parse_square(to)?;
 
         self.require_phase(Phase::Normal, "a move")?;
-        require_kings(self.game.board())?;
 
         self.game.make_move(origin, destination)?;
         self.state()
@@ -572,17 +572,20 @@ impl GameApi {
 
 // --- Snapshots ----------------------------------------------------------
 
-fn require_kings(board: &Board) -> Result<()> {
-    for (side, color) in [(Side::White, Color::White), (Side::Black, Color::Black)] {
-        let present = board
-            .pieces
-            .values()
-            .any(|piece| piece.side == side && piece.piece_type == PieceType::King);
-        if !present {
-            return Err(ApiError::MissingKing { color });
-        }
-    }
-    Ok(())
+/// Which king a hand-set-up position is missing, for the error message only —
+/// [`Game::from_board`] is what decides whether the position is playable.
+///
+/// White first, so a board with neither king names the first one a caller would
+/// have to add.
+fn missing_king(pieces: &[PlacedPiece]) -> Option<ApiError> {
+    [Color::White, Color::Black]
+        .into_iter()
+        .find(|&color| {
+            !pieces
+                .iter()
+                .any(|placed| placed.kind == Kind::King && placed.color == color)
+        })
+        .map(|color| ApiError::MissingKing { color })
 }
 
 fn snapshot(game: &mut Game) -> GameState {
@@ -618,9 +621,7 @@ fn snapshot(game: &mut Game) -> GameState {
         .count();
 
     let active = game.active_side();
-    // The engine's check detection only looks at the side to move, and panics
-    // if that king is gone, so a set-up position without kings reports no check.
-    let check = require_kings(game.board()).is_ok() && game.king_in_check(active);
+    let check = game.king_in_check(active);
 
     // `winner` errors while the game is still running, which is exactly the
     // `None` this field wants.
