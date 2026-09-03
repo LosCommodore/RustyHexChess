@@ -107,8 +107,11 @@ itself does not.
       the kings *afterwards* — [`test_check_mate`](engine/src/lib.rs#L627),
       [`test_en_passant`](engine/src/lib.rs#L694),
       [`test_disallow_pinned_moves`](engine/src/lib.rs#L733).
-- [ ] Note that this is necessary but not sufficient: `Board::pieces` is `pub`, so
-      a king can still be removed after construction. B2 stays on the list.
+- [ ] Drop `Default` from the derive on [`Game`](engine/src/lib.rs#L67), or make it
+      the standard starting position. `Game::default()` is public and yields an
+      empty board, which walks straight past whatever `Game::new` checks — and
+      `king_in_check` is `pub`, so it panics on the spot. Nothing calls
+      `Game::default()`, so removing it is free.
 
 ---
 
