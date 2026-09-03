@@ -66,25 +66,6 @@ draw, but nothing ever produces one.
 
 ## B. Bugs that block the above — fix first
 
-### B2. `king_in_check` panics on a missing king
-
-[lib.rs:148](engine/src/lib.rs#L148). `GameApi` guards it with `require_kings`,
-but `Game` is public and the panic is reachable from the CLI and from tests.
-
-- [ ] Return a `UserError` instead of panicking.
-
-### B3. Move generation assumes the queried piece belongs to the side to move
-
-Two places take the side from `self.active_side` rather than from the piece in
-hand, so both filter against the wrong side when `get_movement_options` is called
-for a piece of the side *not* to move. `GameApi` blocks that; `Game` is public and
-does not.
-
-- [ ] [`move_creates_check_on_active_king`](engine/src/lib.rs#L163) — tests the
-      active king regardless of whose move it is validating.
-- [ ] [lib.rs:228](engine/src/lib.rs#L228) — `pawn_capture_moves(self.active_side)`
-      inside `get_en_passant_moves`, which already has `pawn.side` in hand.
-
 ### B4. `api` is commented out of the build
 
 [`pub mod api;`](engine/src/lib.rs#L1) is disabled, so `GameApi` compiles against

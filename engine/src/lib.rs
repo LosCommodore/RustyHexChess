@@ -168,7 +168,7 @@ impl Game {
             .iter()
             .find(|(_, piece)| piece.side == kings_side && piece.piece_type == PieceType::King)
         else {
-            panic!("King is missing on board")
+            unreachable!("Game invariant: both kings are present on the board")
         };
 
         let is_check: bool = enemy_pieces.iter().any(|(&pos, _)| {
@@ -183,9 +183,11 @@ impl Game {
         is_check
     }
 
-    pub fn move_creates_check_on_active_king(&mut self, mv: &GameMove) -> bool {
+    // Check if a move cannot be executed because the figure is pinned and thus the move
+    // would create a check on the own king
+    pub fn is_pinned_move(&mut self, mv: &GameMove) -> bool {
         self.board.execute(&mv);
-        let check = self.king_in_check(self.active_side);
+        let check = self.king_in_check(mv.piece.side);
         self.board.undo(&mv);
         check
     }
@@ -204,7 +206,7 @@ impl Game {
                 .expect("A piece must be here");
 
             for mv in mv_options {
-                if !self.move_creates_check_on_active_king(&mv) {
+                if !self.is_pinned_move(&mv) {
                     allowed_moves.push(mv.clone());
                 }
             }
@@ -223,7 +225,7 @@ impl Game {
             mv.extend(self.get_en_passant_moves(&pos, &p));
         }
 
-        mv.retain(|x| !self.move_creates_check_on_active_king(x));
+        mv.retain(|x| !self.is_pinned_move(x));
         Ok(mv)
     }
 
@@ -248,7 +250,7 @@ impl Game {
         let en_passant_pos = Position::new(last.origin.pos().0, x).expect("Invalid position ???");
 
         // -- Check if given pawn can capture en passant
-        let capture_moves = pawn_capture_moves(self.active_side);
+        let capture_moves = pawn_capture_moves(pawn.side);
         let mut moves = Vec::new();
 
         for (dy, dx) in capture_moves {
