@@ -195,12 +195,17 @@ impl Game {
 
     pub fn get_movement_options(&mut self, pos: Position) -> Result<Vec<GameMove>> {
         let mut mv = self.board.get_movement_options(pos)?;
-        mv.extend(self.get_en_passant_moves());
+        let p = self.board.pieces.get(&pos).expect("no piece ???");
+        if p.piece_type == PieceType::Pawn {
+            mv.extend(self.get_en_passant_moves(&pos, &p));
+        }
+
         mv.retain(|x| !self.move_creates_check_on_active_king(x));
         Ok(mv)
     }
 
-    fn get_en_passant_moves(&mut self) -> Vec<GameMove> {
+    // Get en_passant_moves for an existing pawn at the given position
+    fn get_en_passant_moves(&self, pos: &Position, pawn: &Piece) -> Vec<GameMove> {
         // -- check if last move enables a potential en passant
         let Some(last) = self.moves.last() else {
             return Vec::new();
@@ -219,42 +224,34 @@ impl Game {
         let x = (last.origin.pos().1 as isize + dx.signum()) as usize;
         let en_passant_pos = Position::new(last.origin.pos().0, x).expect("Invalid position ???");
 
-        // -- find all own pawns
-        let starter_pawns: Vec<_> = self
-            .pieces_by_side(self.active_side)
-            .into_iter()
-            .filter(|(_, piece)| piece.piece_type == PieceType::Pawn)
-            .collect();
-
-        // -- Iterate over these pawns and find possible en passant moves
+        // -- Check if given pawn can capture en passant
         let capture_moves = pawn_capture_moves(self.active_side);
         let mut moves = Vec::new();
-        for (pos, pawn) in &starter_pawns {
-            for (dy, dx) in capture_moves {
-                let (y, x) = pos.coordinates();
-                let y = y.checked_add_signed(*dy);
-                let x = x.checked_add_signed(*dx);
 
-                let (Some(y), Some(x)) = (y, x) else {
-                    continue;
+        for (dy, dx) in capture_moves {
+            let (y, x) = pos.coordinates();
+            let y = y.checked_add_signed(*dy);
+            let x = x.checked_add_signed(*dx);
+
+            let (Some(y), Some(x)) = (y, x) else {
+                continue;
+            };
+            let Ok(destination) = Position::new(y, x) else {
+                continue;
+            };
+
+            if destination == en_passant_pos {
+                let new_move = GameMove {
+                    piece: pawn.clone(),
+                    origin: *pos,
+                    destination,
+                    action: Action::Capture {
+                        enemy: last.piece.clone(),
+                        pos: last.destination,
+                    },
                 };
-                let Ok(destination) = Position::new(y, x) else {
-                    continue;
-                };
 
-                if destination == en_passant_pos {
-                    let new_move = GameMove {
-                        piece: pawn.clone(),
-                        origin: *pos,
-                        destination,
-                        action: Action::Capture {
-                            enemy: last.piece.clone(),
-                            pos: last.destination,
-                        },
-                    };
-
-                    moves.push(new_move);
-                }
+                moves.push(new_move);
             }
         }
 
