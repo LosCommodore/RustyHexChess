@@ -85,27 +85,18 @@ does not.
 - [ ] [lib.rs:228](engine/src/lib.rs#L228) — `pawn_capture_moves(self.active_side)`
       inside `get_en_passant_moves`, which already has `pawn.side` in hand.
 
-### B4. A new game must require both kings
+### B4. `api` is commented out of the build
 
-[`Game::new`](engine/src/lib.rs#L85) accepts any `Board`, so a game can start
-without kings and hit the panic in B2 on the first move.
-[`GameApi::from_pieces`](engine/src/api.rs#L451) already checks — the engine
-itself does not.
+[`pub mod api;`](engine/src/lib.rs#L1) is disabled, so `GameApi` compiles against
+nothing and its call sites have drifted from the engine.
 
-- [ ] Reject a board missing either king in `Game::new`. It returns `Self` today,
-      so this changes the signature to a `Result` and touches `GameApi::new`,
-      `GameApi::from_pieces` and [bin/main.rs](engine/src/bin/main.rs).
-- [ ] Reuse the existing [`require_kings`](engine/src/api.rs#L575) check by moving
-      it down into the engine, rather than writing a second one.
-- [ ] Update the tests that construct from an empty `Board::default()` and insert
-      the kings *afterwards* — [`test_check_mate`](engine/src/lib.rs#L627),
-      [`test_en_passant`](engine/src/lib.rs#L694),
-      [`test_disallow_pinned_moves`](engine/src/lib.rs#L733).
-- [ ] Drop `Default` from the derive on [`Game`](engine/src/lib.rs#L67), or make it
-      the standard starting position. `Game::default()` is public and yields an
-      empty board, which walks straight past whatever `Game::new` checks — and
-      `king_in_check` is `pub`, so it panics on the spot. Nothing calls
-      `Game::default()`, so removing it is free.
+- [ ] Re-enable the module and fix the stale constructor calls:
+      [api.rs:443](engine/src/api.rs#L443) and
+      [api.rs:466](engine/src/api.rs#L466) still call `Game::new(None)` /
+      `Game::new(Some(board))`, a signature that no longer exists.
+- [ ] Drop [`require_kings`](engine/src/api.rs#L575) in favour of the check now in
+      `Game::from_board`, rather than keeping two implementations. Its four call
+      sites in `api.rs` go with it.
 
 ---
 

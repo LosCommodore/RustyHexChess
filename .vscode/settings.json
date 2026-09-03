@@ -16,14 +16,19 @@
     "colour",
     "containerpub",
     "crossterm",
+    "Gliński",
+    "halfmove",
     "insta",
     "msvc",
+    "Perft",
     "remis",
     "signum",
     "statemachine",
     "statesimpl",
     "statespub",
     "thiserror",
-    "tsify"
+    "tsify",
+    "unattacked",
+    "Zobrist"
   ],
 }
