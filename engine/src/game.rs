@@ -120,12 +120,17 @@ impl Game {
             ));
         }
 
-        Ok(Game {
+        let mut game = Game {
             board,
             active_side: Side::White,
             moves: Vec::new(),
             state: GameState::Normal,
-        })
+        };
+
+        // A hand-set-up position can already be finished before anyone moved.
+        game.update_state();
+
+        Ok(game)
     }
 
     pub fn board(&self) -> &Board {
@@ -186,7 +191,6 @@ impl Game {
         is_check
     }
 
-    // Checks that the move does not leave the own king in check
     pub fn move_leaves_king_in_check(&mut self, mv: &GameMove) -> bool {
         self.board.execute(&mv);
         let check = self.king_in_check(mv.piece.side);
@@ -292,32 +296,37 @@ impl Game {
         }
     }
 
+    // Derives the game state from the position: the side to move having no legal
+    // move ends the game. Must be called whenever the position or the side to move
+    // changes, and only while the game is not waiting for a promotion.
+    fn update_state(&mut self) {
+        self.state = match self.check_king() {
+            KingState::CheckMate => GameState::GameOver(GameResult {
+                winner: Some(!self.active_side),
+                outcome: OutCome::CheckMate,
+            }),
+            KingState::StaleMate => GameState::GameOver(GameResult {
+                winner: None,
+                outcome: OutCome::StaleMate,
+            }),
+            KingState::Ok | KingState::Check => GameState::Normal,
+        };
+    }
+
     // This function is executed after a new move is played.
     fn next_turn(&mut self) {
         self.active_side = !self.active_side;
-
-        match self.check_king() {
-            KingState::CheckMate => {
-                self.state = GameState::GameOver(GameResult {
-                    winner: Some(!self.active_side),
-                    outcome: OutCome::CheckMate,
-                })
-            }
-            KingState::StaleMate => {
-                self.state = GameState::GameOver(GameResult {
-                    winner: None,
-                    outcome: OutCome::StaleMate,
-                })
-            }
-            KingState::Ok => (),
-            KingState::Check => (),
-        };
+        self.update_state();
     }
 
     /// Sets who moves first. Only meaningful before any move has been played,
     /// i.e. when a game starts from a position that was set up by hand.
     pub fn with_active_side(&mut self, side: Side) {
         self.active_side = side;
+
+        // The position is only finished for whoever is on turn, so switching sides
+        // can end the game or bring it back to life.
+        self.update_state();
     }
 
     // Make a move using human coordinates
@@ -743,6 +752,57 @@ mod tests {
             .insert(human(('K', 3)).unwrap(), Piece::new(Queen, White));
 
         assert!(matches!(game.check_king(), KingState::Check { .. }));
+    }
+
+    // A position that is already stalemate when the game is set up must be
+    // reported as over, not as a normal position whose every move is illegal.
+    #[test]
+    fn test_stale_mate_on_setup() {
+        use PieceType::*;
+        use Side::*;
+        let human = Position::from_human;
+
+        let mut board = Board::default();
+
+        board
+            .pieces
+            .insert(human(('A', 6)).unwrap(), Piece::new(King, Black));
+
+        board
+            .pieces
+            .insert(human(('C', 7)).unwrap(), Piece::new(King, White));
+
+        board
+            .pieces
+            .insert(human(('D', 4)).unwrap(), Piece::new(Queen, White));
+
+        let mut game = Game::from_board(board).expect("Invalid board ???");
+
+        // White is on turn by default and still has moves
+        assert_eq!(game.check_king(), KingState::Ok);
+        assert!(matches!(game.state, GameState::Normal));
+
+        // Black's king is unattacked but every one of its moves runs into the queen
+        game.with_active_side(Black);
+
+        assert_eq!(game.check_king(), KingState::StaleMate);
+        assert!(
+            matches!(game.state, GameState::GameOver { .. }),
+            "should be game over"
+        );
+
+        let result = game.game_result().expect("no game result !");
+        assert_eq!(result.winner, None);
+        assert!(matches!(result.outcome, OutCome::StaleMate));
+
+        assert!(matches!(
+            game.make_human_move(('A', 6), ('A', 7)),
+            Err(UserError::WrongGameState(_))
+        ));
+
+        // Handing the turn back to White revives the game
+        game.with_active_side(White);
+        assert!(matches!(game.state, GameState::Normal));
     }
 
     #[test]
