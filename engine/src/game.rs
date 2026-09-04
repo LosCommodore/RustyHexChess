@@ -103,7 +103,7 @@ impl Game {
         board.pieces.extend(get_startup_pieces_white());
         board.pieces.extend(get_startup_pieces_black());
 
-        return Self::from_board(board).expect("Invalid board ???");
+        Self::from_board(board).expect("Invalid board ???")
     }
 
     pub fn from_board(board: Board) -> Result<Self> {
@@ -192,9 +192,9 @@ impl Game {
     }
 
     pub fn move_leaves_king_in_check(&mut self, mv: &GameMove) -> bool {
-        self.board.execute(&mv);
+        self.board.execute(mv);
         let check = self.king_in_check(mv.piece.side);
-        self.board.undo(&mv);
+        self.board.undo(mv);
         check
     }
 
@@ -223,7 +223,7 @@ impl Game {
             .expect("No piece? Function should already have returned with an error");
 
         if p.piece_type == PieceType::Pawn {
-            mv.extend(self.get_en_passant_moves(&pos, &p));
+            mv.extend(self.get_en_passant_moves(&pos, p));
         }
 
         mv.retain(|x| !self.move_leaves_king_in_check(x));
@@ -453,6 +453,12 @@ impl Not for Side {
             Side::White => Side::Black,
             Side::Black => Side::White,
         }
+    }
+}
+
+impl Default for Game {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

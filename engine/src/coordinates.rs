@@ -54,12 +54,8 @@ impl Position {
         let Some(x) = x_human.checked_sub(1) else {
             return Err(error());
         };
-        let (x0, x1) = X_RANGE[y];
-        if !(x0..=x1).contains(&x) {
-            return Err(error());
-        }
 
-        Ok(Self { y, x })
+        Self::new(y, x)
     }
 
     pub fn new(y: usize, x: usize) -> Result<Self> {

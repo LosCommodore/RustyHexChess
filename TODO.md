@@ -137,11 +137,6 @@ In [api.rs](engine/src/api.rs) and [wasm.rs](engine/src/wasm.rs):
       test for check. A copy-based or attack-map approach would make the query
       `&self`, and would let [`player_has_movement_options`](engine/src/game.rs#L201)
       stop cloning the piece map.
-- [ ] [`X_RANGE`](engine/src/coordinates.rs#L19) is documented as an "open
-      interval" but both [`from_human`](engine/src/coordinates.rs#L46) and
-      [`is_on_board`](engine/src/coordinates.rs#L94) treat it as closed — that
-      comment already caused one off-by-one. Fix the comment, and consider having
-      `from_human` call `is_on_board` instead of restating the bounds rule.
 - [ ] Optional, decide if in scope: clocks and time forfeit; a FEN-equivalent
       position import/export, which would also hand A2 a compact position key.
 
