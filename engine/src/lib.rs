@@ -1,4 +1,4 @@
-pub mod api;
+// pub mod api; // todo: uncomment later and adjust api to the code changes
 pub mod board;
 pub mod coordinates;
 mod movement;
@@ -62,15 +62,41 @@ pub enum Side {
     Black,
 }
 
-#[derive(Copy, Default, Debug, Clone, Serialize)]
+#[derive(Copy, Debug, Clone, Serialize)]
 
+pub enum OutCome {
+    CheckMate,
+
+    // no legal moves available anywhere on the board, but king is not in check
+    StaleMate,
+
+    ThreefoldRepetition,
+
+    // A player can claim a draw if 50 consecutive moves have been played by each side (amounting to 100 total ply/half-moves) without:♟️ Any pawn being moved.⚔️ Any piece being captured.If either of those two actions happens, the counter instantly resets to zero, and the 50-move countdown starts all over again.
+    FiftyMoves,
+
+    // A game is drawn due to insufficient material if it is mathematically impossible to construct a legal checkmate position
+    // King + 1 Bishop vs. King: A single bishop can only traverse hexes of its own color. Because a hex board uses 3 colors (instead of 2), a lone bishop is completely powerless to trap a king.
+    // King + 1 Knight vs. King: Just like standard chess, a single knight cannot trap and mate a lone king by itself.
+    InsufficientMaterial,
+
+    Agreement,
+    Resignation,
+}
+
+#[derive(Copy, Debug, Clone, Serialize)]
+
+pub struct GameResult {
+    winner: Option<Side>,
+    outcome: OutCome,
+}
+
+#[derive(Copy, Default, Debug, Clone, Serialize)]
 pub enum GameState {
     #[default]
     Normal,
     Promotion,
-    GameOver {
-        winner: Option<Side>,
-    },
+    GameOver(GameResult),
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -134,14 +160,10 @@ impl Game {
         self.state
     }
 
-    /// The winning side. `None` is a draw (remis).
-    ///
-    /// Errors while the game is still running, so that "nobody won" and
-    /// "nobody has won *yet*" stay distinguishable.
-    pub fn winner(&self) -> Result<Option<Side>> {
+    pub fn game_result(&self) -> Option<GameResult> {
         match self.state {
-            GameState::GameOver { winner } => Ok(winner),
-            state => Err(UserError::WrongGameState(state)),
+            GameState::GameOver(x) => Some(x),
+            _ => None,
         }
     }
 
@@ -287,9 +309,10 @@ impl Game {
         self.active_side = !self.active_side;
 
         if matches!(self.check_king(), KingState::Mate) {
-            self.state = GameState::GameOver {
+            self.state = GameState::GameOver(GameResult {
                 winner: Some(!self.active_side),
-            }
+                outcome: OutCome::CheckMate,
+            })
         }
     }
 
@@ -706,7 +729,10 @@ mod tests {
             matches!(game.state, GameState::GameOver { .. }),
             "should be game over"
         );
-        assert_eq!(game.winner().expect("game is over"), Some(Side::Black));
+        assert_eq!(
+            game.game_result().expect("no game result !").winner,
+            Some(Side::Black)
+        );
 
         // A finished game rejects further moves
         assert!(matches!(
