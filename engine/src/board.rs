@@ -30,7 +30,7 @@ pub enum MoveError {
     InvalidPosition,
 }
 
-type Result<T> = std::result::Result<T, super::MoveError>;
+type Result<T> = std::result::Result<T, MoveError>;
 
 /// Possible Actions for a Piece
 /// Note:

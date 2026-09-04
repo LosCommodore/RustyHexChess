@@ -1,0 +1,45 @@
+---
+source: engine/src/game.rs
+expression: options
+---
+[
+    GameMove {
+        piece: Piece {
+            piece_type: Pawn,
+            side: Black,
+        },
+        origin: Position {
+            y: 8,
+            x: 2,
+        },
+        destination: Position {
+            y: 8,
+            x: 1,
+        },
+        action: Move,
+    },
+    GameMove {
+        piece: Piece {
+            piece_type: Pawn,
+            side: Black,
+        },
+        origin: Position {
+            y: 8,
+            x: 2,
+        },
+        destination: Position {
+            y: 9,
+            x: 1,
+        },
+        action: Capture {
+            enemy: Piece {
+                piece_type: Pawn,
+                side: White,
+            },
+            pos: Position {
+                y: 9,
+                x: 2,
+            },
+        },
+    },
+]

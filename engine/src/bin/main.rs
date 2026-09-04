@@ -3,10 +3,11 @@
 use std::{error::Error, marker};
 
 use engine::{
-    Game, Side,
+    Side,
     board::Board,
     coordinates::Position,
     display::{self, save_board_to_html_file, write_html},
+    game::Game,
     piece::{Piece, PieceType, get_startup_pieces_black, get_startup_pieces_white},
 };
 
