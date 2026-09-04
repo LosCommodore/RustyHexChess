@@ -43,12 +43,23 @@ pub struct Position {
 
 impl Position {
     /// Creates a Position form a human notation
-    pub fn from_human((y, x): HumanNotation) -> Result<Self> {
-        if !(1..=BOARD_DIM).contains(&x) {
-            return Err(CoordinateError::InvalidHumanNotation { y, x });
+    pub fn from_human((y_human, x_human): HumanNotation) -> Result<Self> {
+        let error = || CoordinateError::InvalidHumanNotation {
+            y: y_human,
+            x: x_human,
+        };
+
+        let y = char_to_num_notation(y_human).ok_or(error())?;
+
+        let Some(x) = x_human.checked_sub(1) else {
+            return Err(error());
+        };
+        let (x0, x1) = X_RANGE[y];
+        if !(x0..=x1).contains(&x) {
+            return Err(error());
         }
-        let y = char_to_num_notation(y).ok_or(CoordinateError::InvalidHumanNotation { y, x })?;
-        Ok(Self { y, x: x - 1 })
+
+        Ok(Self { y, x })
     }
 
     pub fn new(y: usize, x: usize) -> Result<Self> {

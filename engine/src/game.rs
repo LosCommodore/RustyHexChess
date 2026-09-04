@@ -67,8 +67,8 @@ pub enum OutCome {
 #[derive(Copy, Debug, Clone, Serialize)]
 
 pub struct GameResult {
-    winner: Option<Side>,
-    outcome: OutCome,
+    pub winner: Option<Side>,
+    pub outcome: OutCome,
 }
 
 #[derive(Copy, Default, Debug, Clone, Serialize)]
@@ -89,9 +89,10 @@ pub struct Game {
 
 #[derive(PartialEq, Eq, Debug)]
 pub enum KingState {
-    Nothing,
-    Check { allowed_moves: Vec<GameMove> },
-    Mate,
+    Ok,
+    Check,
+    CheckMate,
+    StaleMate,
 }
 
 pub type Result<T> = std::result::Result<T, UserError>;
@@ -185,49 +186,43 @@ impl Game {
         is_check
     }
 
-    // Check if a move cannot be executed because the figure is pinned and thus the move
-    // would create a check on the own king
-    pub fn is_pinned_move(&mut self, mv: &GameMove) -> bool {
+    // Checks that the move does not leave the own king in check
+    pub fn move_leaves_king_in_check(&mut self, mv: &GameMove) -> bool {
         self.board.execute(&mv);
         let check = self.king_in_check(mv.piece.side);
         self.board.undo(&mv);
         check
     }
 
-    pub fn check_king(&mut self) -> KingState {
-        if !self.king_in_check(self.active_side) {
-            return KingState::Nothing;
-        }
-
+    fn player_has_movement_options(&mut self) -> bool {
         let my_pieces = self.pieces_by_side(self.active_side);
 
-        let mut allowed_moves = Vec::new();
         for (origin, _) in my_pieces {
             let mv_options = self
                 .get_movement_options(origin)
                 .expect("A piece must be here");
 
-            for mv in mv_options {
-                if !self.is_pinned_move(&mv) {
-                    allowed_moves.push(mv.clone());
-                }
+            if !mv_options.is_empty() {
+                return true;
             }
         }
-        if allowed_moves.len() == 0 {
-            return KingState::Mate;
-        } else {
-            return KingState::Check { allowed_moves };
-        }
+        false
     }
 
+    // Get valid movement options for a piece at a given position.
     pub fn get_movement_options(&mut self, pos: Position) -> Result<Vec<GameMove>> {
         let mut mv = self.board.get_movement_options(pos)?;
-        let p = self.board.pieces.get(&pos).expect("no piece ???");
+        let p = self
+            .board
+            .pieces
+            .get(&pos)
+            .expect("No piece? Function should already have returned with an error");
+
         if p.piece_type == PieceType::Pawn {
             mv.extend(self.get_en_passant_moves(&pos, &p));
         }
 
-        mv.retain(|x| !self.is_pinned_move(x));
+        mv.retain(|x| !self.move_leaves_king_in_check(x));
         Ok(mv)
     }
 
@@ -285,15 +280,38 @@ impl Game {
         moves
     }
 
+    pub fn check_king(&mut self) -> KingState {
+        let has_options = self.player_has_movement_options();
+        let is_check = self.king_in_check(self.active_side);
+
+        match (is_check, has_options) {
+            (false, false) => KingState::StaleMate,
+            (true, false) => KingState::CheckMate,
+            (false, true) => KingState::Ok,
+            (true, true) => KingState::Check,
+        }
+    }
+
+    // This function is executed after a new move is played.
     fn next_turn(&mut self) {
         self.active_side = !self.active_side;
 
-        if matches!(self.check_king(), KingState::Mate) {
-            self.state = GameState::GameOver(GameResult {
-                winner: Some(!self.active_side),
-                outcome: OutCome::CheckMate,
-            })
-        }
+        match self.check_king() {
+            KingState::CheckMate => {
+                self.state = GameState::GameOver(GameResult {
+                    winner: Some(!self.active_side),
+                    outcome: OutCome::CheckMate,
+                })
+            }
+            KingState::StaleMate => {
+                self.state = GameState::GameOver(GameResult {
+                    winner: None,
+                    outcome: OutCome::StaleMate,
+                })
+            }
+            KingState::Ok => (),
+            KingState::Check => (),
+        };
     }
 
     /// Sets who moves first. Only meaningful before any move has been played,
@@ -674,7 +692,7 @@ mod tests {
 
         let mut game = Game::from_board(board).expect("Invalid board ???");
 
-        assert_eq!(game.check_king(), KingState::Nothing);
+        assert_eq!(game.check_king(), KingState::Ok);
 
         game.board
             .pieces
