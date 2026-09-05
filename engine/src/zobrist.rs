@@ -38,7 +38,9 @@ const SEED: u64 = 0x0DDB_1A5E_5BAD_5EED;
 // them at runtime would make all of that meaningless.
 static KEYS: [u64; NR_KEYS] = zobrist_keys(SEED);
 
-pub struct Zobrist {
+/// The Zobrist hash of one position: piece placement, side to move, and the
+/// en-passant field if a capture is available there.
+pub struct PositionHash {
     hash: u64,
 }
 
@@ -63,39 +65,39 @@ const fn zobrist_keys<const N: usize>(seed: u64) -> [u64; N] {
     keys
 }
 
-fn field_key(pos: &Position, piece: &Piece) -> u64 {
+fn field_key(pos: Position, piece: &Piece) -> u64 {
     let idx = pos.id() * NR_FIELD_VARIANTS
         + (piece.piece_type as usize) * Side::COUNT
         + piece.side as usize;
     KEYS[idx]
 }
 
-fn en_passant_key(target: &Position) -> u64 {
+fn en_passant_key(target: Position) -> u64 {
     KEYS[EN_PASSANT + target.id()]
 }
 
-impl Zobrist {
+impl PositionHash {
     /// `en_passant` is the field a pawn may be captured *on* this turn — the one
     /// the double-stepping pawn skipped over — and it must be `None` unless a
     /// pawn of the side to move can really capture there. A double step nobody
     /// can answer leaves the position identical to the same placement reached
     /// any other way, so folding its field in regardless would hide repetitions.
-    pub fn from_board(board: &Board, blacks_turn: bool, en_passant: Option<Position>) -> Self {
+    pub fn from_board(board: &Board, active_side: Side, en_passant: Option<Position>) -> Self {
         Self {
-            hash: Self::init_hash(board, blacks_turn, en_passant),
+            hash: Self::init_hash(board, active_side, en_passant),
         }
     }
 
-    fn init_hash(board: &Board, blacks_turn: bool, en_passant: Option<Position>) -> u64 {
+    fn init_hash(board: &Board, active_side: Side, en_passant: Option<Position>) -> u64 {
         let mut hash = 0u64;
-        for (pos, piece) in &board.pieces {
+        for (&pos, piece) in &board.pieces {
             hash ^= field_key(pos, piece);
         }
-        if blacks_turn {
+        if active_side == Side::Black {
             hash ^= KEYS[BLACKS_TURN];
         }
         if let Some(target) = en_passant {
-            hash ^= en_passant_key(&target);
+            hash ^= en_passant_key(target);
         }
 
         hash
@@ -111,7 +113,7 @@ impl Zobrist {
     /// Only the caller knows whether a field is being vacated or filled, so a
     /// call in the wrong place goes unnoticed here and shows up as a hash that
     /// drifts away from the position.
-    pub fn update_piece(&mut self, pos: &Position, piece: &Piece) {
+    pub fn update_piece(&mut self, pos: Position, piece: &Piece) {
         self.hash ^= field_key(pos, piece);
     }
 
@@ -124,7 +126,7 @@ impl Zobrist {
 
     /// Takes the previously available en-passant field back out of the hash and
     /// folds the new one in. Both are `None` when no capture is available; see
-    /// [`Zobrist::from_board`] for what counts as available.
+    /// [`PositionHash::from_board`] for what counts as available.
     ///
     /// Undo needs no separate path: XOR is its own inverse, so replaying the
     /// same two fields the other way round restores the old hash exactly.
@@ -133,10 +135,10 @@ impl Zobrist {
             return;
         }
         if let Some(old) = old {
-            self.hash ^= en_passant_key(&old);
+            self.hash ^= en_passant_key(old);
         }
         if let Some(new) = new {
-            self.hash ^= en_passant_key(&new);
+            self.hash ^= en_passant_key(new);
         }
     }
 
@@ -189,9 +191,9 @@ mod tests {
         let one = Position::from_human(('J', 2)).unwrap();
         let other = Position::from_human(('B', 6)).unwrap();
 
-        let plain = Zobrist::from_board(&board, false, None);
-        let on_one = Zobrist::from_board(&board, false, Some(one));
-        let on_other = Zobrist::from_board(&board, false, Some(other));
+        let plain = PositionHash::from_board(&board, Side::White, None);
+        let on_one = PositionHash::from_board(&board, Side::White, Some(one));
+        let on_other = PositionHash::from_board(&board, Side::White, Some(other));
 
         assert_ne!(plain.hash(), on_one.hash());
         assert_ne!(plain.hash(), on_other.hash());
@@ -206,19 +208,19 @@ mod tests {
         let one = Position::from_human(('J', 2)).unwrap();
         let other = Position::from_human(('B', 6)).unwrap();
 
-        let mut hash = Zobrist::from_board(&board, false, None);
+        let mut hash = PositionHash::from_board(&board, Side::White, None);
         let plain = hash.hash();
 
         hash.update_en_passant(None, Some(one));
         assert_eq!(
             hash.hash(),
-            Zobrist::from_board(&board, false, Some(one)).hash()
+            PositionHash::from_board(&board, Side::White, Some(one)).hash()
         );
 
         hash.update_en_passant(Some(one), Some(other));
         assert_eq!(
             hash.hash(),
-            Zobrist::from_board(&board, false, Some(other)).hash()
+            PositionHash::from_board(&board, Side::White, Some(other)).hash()
         );
 
         hash.update_en_passant(Some(other), None);
@@ -239,18 +241,21 @@ mod tests {
         let moved = after.pieces.remove(&origin).expect("no king at the origin");
         after.pieces.insert(destination, moved);
 
-        let mut hash = Zobrist::from_board(&before, false, None);
+        let mut hash = PositionHash::from_board(&before, Side::White, None);
         let white_to_move = hash.hash();
 
-        hash.update_piece(&origin, &king);
-        hash.update_piece(&destination, &king);
+        hash.update_piece(origin, &king);
+        hash.update_piece(destination, &king);
         hash.update_active_player();
 
-        assert_eq!(hash.hash(), Zobrist::from_board(&after, true, None).hash());
+        assert_eq!(
+            hash.hash(),
+            PositionHash::from_board(&after, Side::Black, None).hash()
+        );
 
         // The same three calls again, in any order, take the move back.
-        hash.update_piece(&destination, &king);
-        hash.update_piece(&origin, &king);
+        hash.update_piece(destination, &king);
+        hash.update_piece(origin, &king);
         hash.update_active_player();
 
         assert_eq!(hash.hash(), white_to_move, "the move did not come back out");
@@ -262,8 +267,8 @@ mod tests {
     fn the_side_to_move_changes_the_hash() {
         let board = two_kings();
 
-        let white = Zobrist::from_board(&board, false, None);
-        let black = Zobrist::from_board(&board, true, None);
+        let white = PositionHash::from_board(&board, Side::White, None);
+        let black = PositionHash::from_board(&board, Side::Black, None);
 
         assert_ne!(white.hash(), black.hash());
     }
