@@ -7,6 +7,7 @@ pub mod coordinates;
 pub mod game;
 mod movement;
 pub mod piece;
+mod zobrist;
 
 /// Terminal and HTML rendering. Not available on wasm: it draws with crossterm.
 #[cfg(not(target_family = "wasm"))]
@@ -16,8 +17,9 @@ pub mod display;
 pub mod wasm;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, EnumIter, Serialize, Hash)]
+#[repr(u8)]
 pub enum Side {
     #[default]
-    White,
-    Black,
+    White = 0,
+    Black = 1,
 }

@@ -16,20 +16,20 @@ type Result<T> = std::result::Result<T, CoordinateError>;
 
 pub type HumanNotation = (char, usize); // (a..k | A..K , 1..11)
 
-// Internal range for 2nd Dimension, zero-indexed, open interval
+// Internal range for 2nd Dimension, zero-indexed, [min, max[
 pub const BOARD_DIM: usize = 11;
 pub const X_RANGE: [(usize, usize); BOARD_DIM] = [
-    (5, 10),
-    (4, 10),
-    (3, 10),
-    (2, 10),
-    (1, 10),
+    (5, 11),
+    (4, 11),
+    (3, 11),
+    (2, 11),
+    (1, 11),
+    (0, 11),
     (0, 10),
     (0, 9),
     (0, 8),
     (0, 7),
     (0, 6),
-    (0, 5),
 ];
 
 /// Position is a valid position on the board
@@ -84,6 +84,12 @@ impl Position {
     pub fn coordinates(&self) -> (usize, usize) {
         (self.y, self.x)
     }
+
+    // unique number for each position, 0..91 without gaps.
+    // `x` is not zero-based within a row, so the row's first x has to come off.
+    pub const fn id(&self) -> usize {
+        X_ACCUMULATED[self.y] + self.x - X_RANGE[self.y].0
+    }
 }
 
 /// Returns true if this position is inside the board boundaries
@@ -93,7 +99,7 @@ const fn is_on_board(y: usize, x: usize) -> bool {
     }
     let x_range = X_RANGE[y];
 
-    x >= x_range.0 && x <= x_range.1
+    x >= x_range.0 && x < x_range.1
 }
 
 impl fmt::Display for Position {
@@ -127,9 +133,33 @@ pub fn char_to_num_notation(y: char) -> Option<usize> {
     Some(y as usize)
 }
 
+// helper function to give each hexagon field a unique 1d-number
+const fn acc_indexes<const N: usize>() -> [usize; N] {
+    let mut x_acc = [0usize; N];
+    let mut state = 0;
+    let mut i = 0;
+
+    // Standard `while` loops are perfectly valid in const fns
+    while i < N {
+        // the offset of this row's first field, so its own length is not included yet
+        x_acc[i] = state;
+
+        let (x_min, x_max) = X_RANGE[i];
+        let x_len = x_max - x_min;
+        state += x_len;
+
+        i += 1;
+    }
+
+    x_acc
+}
+
+const X_ACCUMULATED: [usize; BOARD_DIM] = acc_indexes();
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashSet;
 
     #[test]
     fn to_human() {
@@ -142,5 +172,22 @@ mod tests {
     #[test]
     fn new_invalid_position() {
         let _ = Position::new(100, 100).unwrap();
+    }
+
+    // Every field gets its own id, and the ids fill 0..91 without gaps, so they can
+    // index a table with one slot per field.
+    #[test]
+    fn ids_are_unique_and_dense() {
+        let all: Vec<Position> = (0..BOARD_DIM)
+            .flat_map(|y| (0..BOARD_DIM).filter_map(move |x| Position::new(y, x).ok()))
+            .collect();
+
+        assert_eq!(all.len(), 91, "the board has 91 fields");
+
+        let ids: HashSet<usize> = all.iter().map(|pos| pos.id()).collect();
+
+        assert_eq!(ids.len(), all.len(), "two fields share an id");
+        assert_eq!(ids.iter().min(), Some(&0));
+        assert_eq!(ids.iter().max(), Some(&(all.len() - 1)));
     }
 }

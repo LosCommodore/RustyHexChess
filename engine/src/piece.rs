@@ -64,13 +64,26 @@ pub struct Piece {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[repr(u8)]
 pub enum PieceType {
-    King,
-    Queen,
-    Rook,
-    Bishop,
-    Knight,
-    Pawn,
+    Pawn = 0,
+    Knight = 1,
+    Bishop = 2,
+    Rook = 3,
+    Queen = 4,
+    King = 5,
+}
+
+impl PieceType {
+    pub const COUNT: usize = 6;
+    pub const ALL: [PieceType; Self::COUNT] = [
+        Self::Pawn,
+        Self::Knight,
+        Self::Bishop,
+        Self::Rook,
+        Self::Queen,
+        Self::King,
+    ];
 }
 
 pub const fn pawn_starting_positions(side: Side) -> [Position; 9] {

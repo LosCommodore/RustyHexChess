@@ -14,6 +14,7 @@
   "cSpell.words": [
     "analysed",
     "bindgen",
+    "clippy",
     "colour",
     "containerpub",
     "crossterm",
@@ -22,6 +23,7 @@
     "insta",
     "msvc",
     "Perft",
+    "playout",
     "prio",
     "remis",
     "signum",
