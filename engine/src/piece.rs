@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use super::coordinates::*;
 use anyhow::{Ok, Result};
 use serde::Serialize;
+use strum::EnumCount;
 
 pub const WHITE_PAWNS_STARTING_POSITIONS: [Position; 9] = [
     Position::new_const(1, 4), // ('B', 5))
@@ -63,7 +64,7 @@ pub struct Piece {
     pub side: Side,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, EnumCount)]
 #[repr(u8)]
 pub enum PieceType {
     Pawn = 0,

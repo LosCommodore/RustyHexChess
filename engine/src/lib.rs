@@ -1,5 +1,5 @@
 use serde::Serialize;
-use strum::EnumIter;
+use strum::{EnumCount, EnumIter};
 
 // pub mod api; // todo: uncomment later and adjust api to the code changes
 pub mod board;
@@ -16,7 +16,7 @@ pub mod display;
 #[cfg(target_family = "wasm")]
 pub mod wasm;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, EnumIter, Serialize, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, EnumIter, Serialize, Hash, EnumCount)]
 #[repr(u8)]
 pub enum Side {
     #[default]

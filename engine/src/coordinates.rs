@@ -18,6 +18,7 @@ pub type HumanNotation = (char, usize); // (a..k | A..K , 1..11)
 
 // Internal range for 2nd Dimension, zero-indexed, [min, max[
 pub const BOARD_DIM: usize = 11;
+pub const NR_FIELDS: usize = 91;
 pub const X_RANGE: [(usize, usize); BOARD_DIM] = [
     (5, 11),
     (4, 11),
@@ -182,7 +183,7 @@ mod tests {
             .flat_map(|y| (0..BOARD_DIM).filter_map(move |x| Position::new(y, x).ok()))
             .collect();
 
-        assert_eq!(all.len(), 91, "the board has 91 fields");
+        assert_eq!(all.len(), NR_FIELDS, "the board has 91 fields");
 
         let ids: HashSet<usize> = all.iter().map(|pos| pos.id()).collect();
 
