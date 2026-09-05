@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 // Board states:
 // 91 Fields * 6 Figures * 2 Colors + 91 en_passant + 1 active player
 

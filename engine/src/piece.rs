@@ -76,7 +76,6 @@ pub enum PieceType {
 }
 
 impl PieceType {
-    pub const COUNT: usize = 6;
     pub const ALL: [PieceType; Self::COUNT] = [
         Self::Pawn,
         Self::Knight,

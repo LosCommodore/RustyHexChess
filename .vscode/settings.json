@@ -27,6 +27,7 @@
     "prio",
     "remis",
     "signum",
+    "splitmix",
     "statemachine",
     "statesimpl",
     "statespub",
