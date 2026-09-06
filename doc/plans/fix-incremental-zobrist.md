@@ -6,9 +6,9 @@ The current working tree replaces `Game::moves: Vec<GameMove>` with `Game::plays
 (move + hash) and adds a running `Game::position_hash`, updated incrementally through
 `PositionHash::update`.
 
-The per-move XOR bookkeeping is now correct. What is still missing is the surrounding state: the
-hash `from_board` starts from is inverted, `undo` never rolls it back, `with_active_side` changes
-the turn behind its back, and the en-passant component is not maintained at all.
+The per-move XOR bookkeeping and the starting hash are now correct. What is still missing is the
+surrounding state: `undo` never rolls the hash back, `with_active_side` changes the turn behind its
+back, and the en-passant component is not maintained at all.
 
 Goal: `position_hash == PositionHash::from_board(&board, active_side, en_passant_field)` at every
 point, including after `undo`.
@@ -17,12 +17,12 @@ point, including after `undo`.
 
 `cargo test -p engine`: **26 passed, 1 failed** — only `test_undo`, and it fails precisely on
 defect 5. The board, `active_side` and `plays` all roll back correctly; `position_hash` stays at
-`3949434852486983072` (the undone move) where `plays.last().hash` holds the right value
-`4372491301682485172`. Since `Game` derives `Serialize` and `position_hash` is a serialized field,
+`2615503373617392328` (the undone move) where `plays.last().hash` holds the right value
+`3327352855844704476`. Since `Game` derives `Serialize` and `position_hash` is a serialized field,
 the test's JSON round-trip comparison is already a hash-consistency check on `undo`.
 
-No test compares `position_hash` against a freshly computed `from_board`, which is why defects 1,
-6 and 8 are all invisible to the suite.
+No test compares `position_hash` against a freshly computed `from_board`, which is why defects 6
+and 8 are both invisible to the suite.
 
 ## Defects
 
@@ -30,7 +30,6 @@ Numbering is stable across revisions; resolved entries have been dropped, so the
 
 | # | Where | Problem |
 |---|-------|---------|
-| 1 | `game.rs:134`, `game.rs:139` | Two bugs in two lines. The hash is built from `!active_player`, so it claims the *other* side is to move; and `active_side` is hardcoded to `Side::White`, so the `active_player` parameter is ignored outright. They cancel only when the caller passes `Side::Black`. `Game::new()` passes `White`: the game opens with White on turn and a hash that says Black. |
 | 5 | `game.rs:415` | `undo` rolls back the board, `active_side` and `state`, but not `position_hash`; `Play::hash` is stored and never read. The one failing test. |
 | 6 | `game.rs:247`, `zobrist.rs:135` | En-passant component never updated incrementally. `update_en_passant` has no non-test caller (warning masked by `#![allow(unused)]` at `zobrist.rs:1`). Positions differing only in en-passant availability collide, and the `en_passant_field` handed to `from_board` is never stored, so it is never cleared from the hash either. |
 | 7 | `game.rs:172`, `lib.rs:13` | `plays()` returns `&[Play]` with private fields and no accessors, and `PositionHash` sits behind a private `mod zobrist` — history and hash are unusable outside the crate. There is no `position_hash()` accessor at all. `api.rs` still calls `game.moves()` (603/606/618/639); no compile error only because it is commented out of `lib.rs`. |
@@ -51,8 +50,6 @@ Numbering is stable across revisions; resolved entries have been dropped, so the
 
 ### `game.rs` — own the en-passant field and the initial hash
 
-- `from_board`: hash with `active_player`, not `!active_player`, and set
-  `active_side: active_player` rather than the hardcoded `Side::White` (defect 1).
 - New field `en_passant_field: Option<Position>`, initialised from `from_board`'s parameter;
   `get_en_passant_field()` becomes the *recompute* after a move. Fixes the constructor case where an
   en-passant field is supplied while `plays` is empty.
@@ -101,13 +98,14 @@ that its `moves()` calls need renaming to `plays()` when it is revived.
 ## Verification
 
 - `cargo test -p engine` — all 27 tests pass.
-- New test, the one that would have caught defects 1, 6 and 8: play a scripted game covering a
+- New test, the one that would catch defects 6 and 8: play a scripted game covering a
   double pawn push, an en-passant capture, a normal capture and a promotion; after **every**
   `make_move`, `promote` and `undo` assert
   `game.position_hash == PositionHash::from_board(&game.board, game.active_side, game.en_passant_field)`.
   With `change_player` gone the invariant holds at every step, promotion included.
-- Add the same assertion to a `Game::new()` and a `from_board(.., Side::Black, ..)` case — defect 1
-  survives today only because nothing checks a freshly constructed game.
+- Add the same assertion to a `Game::new()` and a `from_board(.., Side::Black, ..)` case. Nothing
+  checks a freshly constructed game today, which is how the old inverted starting hash went
+  unnoticed through a green-but-for-`test_undo` suite; a regression there would be just as silent.
 - Second test: move-then-undo returns the exact prior hash, and two move orders reaching the same
   position hash equal (transposition).
 - `cargo clippy -p engine` — consider removing `#![allow(unused)]` from `zobrist.rs:1` so dead code

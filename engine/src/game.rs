@@ -131,12 +131,12 @@ impl Game {
             ));
         }
 
-        let position_hash = PositionHash::from_board(&board, !active_player, en_passant_field);
+        let position_hash = PositionHash::from_board(&board, active_player, en_passant_field);
 
         let mut game = Game {
             board,
             position_hash,
-            active_side: Side::White,
+            active_side: active_player,
             plays: Vec::new(),
             state: GameState::Normal,
         };
