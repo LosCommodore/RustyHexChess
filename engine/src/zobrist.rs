@@ -8,11 +8,12 @@
 //   field 0 | piece 1 | color 0
 //   ...
 
+use serde::Serialize;
 use strum::EnumCount;
 
 use crate::{
     Side,
-    board::Board,
+    board::{Action, Board, GameMove},
     coordinates::{NR_FIELDS, Position},
     piece::{Piece, PieceType},
 };
@@ -40,6 +41,7 @@ static KEYS: [u64; NR_KEYS] = zobrist_keys(SEED);
 
 /// The Zobrist hash of one position: piece placement, side to move, and the
 /// en-passant field if a capture is available there.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 pub struct PositionHash {
     hash: u64,
 }
@@ -113,14 +115,14 @@ impl PositionHash {
     /// Only the caller knows whether a field is being vacated or filled, so a
     /// call in the wrong place goes unnoticed here and shows up as a hash that
     /// drifts away from the position.
-    pub fn update_piece(&mut self, pos: Position, piece: &Piece) {
+    fn update_piece(&mut self, pos: Position, piece: &Piece) {
         self.hash ^= field_key(pos, piece);
     }
 
     /// Hands the turn to the other side. There is one key for this, folded in
     /// while Black is to move and out again when it is White's turn, so this
     /// takes no side: calling it is the change of turn itself.
-    pub fn update_active_player(&mut self) {
+    fn update_active_player(&mut self) {
         self.hash ^= KEYS[BLACKS_TURN];
     }
 
@@ -130,7 +132,7 @@ impl PositionHash {
     ///
     /// Undo needs no separate path: XOR is its own inverse, so replaying the
     /// same two fields the other way round restores the old hash exactly.
-    pub fn update_en_passant(&mut self, old: Option<Position>, new: Option<Position>) {
+    fn update_en_passant(&mut self, old: Option<Position>, new: Option<Position>) {
         if old == new {
             return;
         }
@@ -139,6 +141,31 @@ impl PositionHash {
         }
         if let Some(new) = new {
             self.hash ^= en_passant_key(new);
+        }
+    }
+
+    pub fn update(&mut self, game_move: &GameMove, change_player: bool) {
+        match game_move.action {
+            Action::Move => {
+                self.update_piece(game_move.origin, &game_move.piece);
+                self.update_piece(game_move.destination, &game_move.piece);
+            }
+            Action::Capture {
+                ref enemy,
+                pos: enemy_pos,
+            } => {
+                self.update_piece(game_move.origin, &game_move.piece);
+                self.update_piece(enemy_pos, enemy);
+                self.update_piece(game_move.destination, &game_move.piece);
+            }
+            Action::Promote { ref to } => {
+                self.update_piece(game_move.origin, &game_move.piece);
+                self.update_piece(game_move.destination, to);
+            }
+        }
+
+        if change_player {
+            self.update_active_player();
         }
     }
 

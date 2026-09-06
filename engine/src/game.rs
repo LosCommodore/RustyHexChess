@@ -3,7 +3,7 @@ use std::{
     ops::Not,
 };
 
-use crate::{Side, board};
+use crate::{Side, board, zobrist::PositionHash};
 use crate::{
     board::{Action, Board, GameMove, MoveError},
     coordinates::{self, HumanNotation, Position},
@@ -71,6 +71,12 @@ pub struct GameResult {
     pub outcome: OutCome,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct Play {
+    game_move: GameMove,
+    hash: PositionHash,
+}
+
 #[derive(Copy, Default, Debug, Clone, Serialize)]
 pub enum GameState {
     #[default]
@@ -83,7 +89,8 @@ pub enum GameState {
 pub struct Game {
     board: Board,
     active_side: Side,
-    moves: Vec<GameMove>,
+    plays: Vec<Play>,
+    position_hash: PositionHash,
     state: GameState,
 }
 
@@ -103,10 +110,14 @@ impl Game {
         board.pieces.extend(get_startup_pieces_white());
         board.pieces.extend(get_startup_pieces_black());
 
-        Self::from_board(board).expect("Invalid board ???")
+        Self::from_board(board, Side::White, None).expect("Invalid board ???")
     }
 
-    pub fn from_board(board: Board) -> Result<Self> {
+    pub fn from_board(
+        board: Board,
+        active_player: Side,
+        en_passant_field: Option<Position>,
+    ) -> Result<Self> {
         let colors: HashSet<_> = board
             .pieces
             .values()
@@ -120,10 +131,13 @@ impl Game {
             ));
         }
 
+        let position_hash = PositionHash::from_board(&board, active_player, en_passant_field);
+
         let mut game = Game {
             board,
-            active_side: Side::White,
-            moves: Vec::new(),
+            position_hash,
+            active_side: Side::Black,
+            plays: Vec::new(),
             state: GameState::Normal,
         };
 
@@ -155,8 +169,8 @@ impl Game {
 
     /// The moves played so far, oldest first. A promotion appears as its own
     /// entry after the pawn move that triggered it.
-    pub fn moves(&self) -> &[GameMove] {
-        &self.moves
+    pub fn plays(&self) -> &[Play] {
+        &self.plays
     }
 
     pub fn pieces_by_side(&self, side: Side) -> HashMap<Position, Piece> {
@@ -230,25 +244,35 @@ impl Game {
         Ok(mv)
     }
 
+    fn get_en_passant_field(&self) -> Option<Position> {
+        let Some(last) = self.plays.last() else {
+            return None;
+        };
+
+        if last.game_move.piece.piece_type != PieceType::Pawn {
+            return None;
+        }
+
+        let dx = last.game_move.destination.coordinates().1 as isize
+            - last.game_move.origin.coordinates().1 as isize;
+        if dx.abs() < 2 {
+            return None;
+        }
+
+        let x = (last.game_move.origin.pos().1 as isize + dx.signum()) as usize;
+        Some(Position::new(last.game_move.origin.pos().0, x).expect("Invalid position ???"))
+    }
+
     // Get en_passant_moves for an existing pawn at the given position
     fn get_en_passant_moves(&self, pos: &Position, pawn: &Piece) -> Vec<GameMove> {
-        // -- check if last move enables a potential en passant
-        let Some(last) = self.moves.last() else {
+        let Some(en_passant_pos) = self.get_en_passant_field() else {
             return Vec::new();
         };
 
-        if last.piece.piece_type != PieceType::Pawn {
-            return Vec::new();
-        }
-
-        let dx = last.destination.coordinates().1 as isize - last.origin.coordinates().1 as isize;
-        if dx.abs() < 2 {
-            return Vec::new();
-        }
-
-        // -- calculate the destination of en-passant
-        let x = (last.origin.pos().1 as isize + dx.signum()) as usize;
-        let en_passant_pos = Position::new(last.origin.pos().0, x).expect("Invalid position ???");
+        let last = self
+            .plays
+            .last()
+            .expect("No last game move? Should not be possible here");
 
         // -- Check if given pawn can capture en passant
         let capture_moves = pawn_capture_moves(pawn.side);
@@ -272,8 +296,8 @@ impl Game {
                     origin: *pos,
                     destination,
                     action: Action::Capture {
-                        enemy: last.piece.clone(),
-                        pos: last.destination,
+                        enemy: last.game_move.piece.clone(),
+                        pos: last.game_move.destination,
                     },
                 };
 
@@ -368,10 +392,16 @@ impl Game {
             return Err(UserError::WrongGameState(self.state));
         }
         let game_move = self.validate_move(origin, destination)?;
-
         // -- Normal move logic
         self.board.execute(&game_move);
-        self.moves.push(game_move.clone());
+
+        let is_promote_move = matches!(game_move.action, Action::Promote { .. });
+        self.position_hash.update(&game_move, !is_promote_move);
+        let play = Play {
+            game_move: game_move.clone(),
+            hash: self.position_hash,
+        };
+        self.plays.push(play);
 
         // -- Promotion logic
         if game_move.piece.piece_type == PieceType::Pawn {
@@ -394,16 +424,16 @@ impl Game {
 
     // Undo the last game move
     pub fn undo(&mut self) -> Result<()> {
-        let Some(mv) = self.moves.pop() else {
+        let Some(play) = self.plays.pop() else {
             return Err(UserError::CannotUndo);
         };
 
-        self.board.undo(&mv);
+        self.board.undo(&play.game_move);
 
         // Whoever played the undone move is on turn again. For a promotion that
         // is the pawn's side, since `promote` records the pawn as the moved piece.
-        self.active_side = mv.piece.side;
-        self.state = match mv.action {
+        self.active_side = play.game_move.piece.side;
+        self.state = match play.game_move.action {
             Action::Promote { .. } => GameState::Promotion,
             Action::Move | Action::Capture { .. } => GameState::Normal,
         };
@@ -421,9 +451,10 @@ impl Game {
         }
 
         let destination = self
-            .moves
+            .plays
             .last()
             .expect("promotion without history ???")
+            .game_move
             .destination;
 
         let new_piece = Piece {
@@ -432,12 +463,17 @@ impl Game {
         };
 
         let old_piece = self.board.pieces.insert(destination, new_piece.clone());
-        self.moves.push(GameMove {
+        let game_move = GameMove {
             piece: old_piece.expect("no piece to promote ??"),
             origin: destination,
             destination,
             action: Action::Promote { to: new_piece },
-        });
+        };
+
+        self.position_hash.update(&game_move, true);
+
+        let hash = self.position_hash;
+        self.plays.push(Play { game_move, hash });
 
         self.state = GameState::Normal;
         self.next_turn();
@@ -529,7 +565,7 @@ mod tests {
                 side: Side::White,
             },
         );
-        let mut game = Game::from_board(board).expect("invalid board ??");
+        let mut game = Game::from_board(board, Side::White, None).expect("invalid board ??");
 
         // -- Move pawn
         game.make_move(origin, destination)
@@ -580,7 +616,7 @@ mod tests {
             },
         );
 
-        let mut game = Game::from_board(board)?;
+        let mut game = Game::from_board(board, Side::White, None)?;
 
         let is_check = game.king_in_check(Side::White);
         assert!(!is_check, "expected no check here 1");
@@ -647,7 +683,7 @@ mod tests {
         );
 
         // White pawn takes Bishop
-        let mut game = Game::from_board(board)?;
+        let mut game = Game::from_board(board, Side::White, None)?;
         let mut game_states = Vec::new();
         game_states.push(serde_json::to_string(&game)?);
 
@@ -673,13 +709,13 @@ mod tests {
             "wrong game state 3"
         );
 
-        println!("undoing move {:?}", game.moves.last());
+        println!("undoing move {:?}", game.plays.last());
         game.undo()?;
         let new_state = serde_json::to_string(&game)?;
         assert_eq!(new_state, last_state, "game state not identical");
 
         for game_state in game_states.into_iter().rev() {
-            println!("undoing move {:?}", game.moves.last());
+            println!("undoing move {:?}", game.plays.last());
             game.undo()?;
             let new_state = serde_json::to_string(&game)?;
             assert_eq!(new_state, game_state, "game state not identical");
@@ -705,7 +741,7 @@ mod tests {
             .pieces
             .insert(human(('A', 11)).unwrap(), Piece::new(King, Black));
 
-        let mut game = Game::from_board(board).expect("Invalid board ???");
+        let mut game = Game::from_board(board, Side::White, None).expect("Invalid board ???");
 
         assert_eq!(game.check_king(), KingState::Ok);
 
@@ -782,7 +818,7 @@ mod tests {
             .pieces
             .insert(human(('D', 4)).unwrap(), Piece::new(Queen, White));
 
-        let mut game = Game::from_board(board).expect("Invalid board ???");
+        let mut game = Game::from_board(board, Side::White, None).expect("Invalid board ???");
 
         // White is on turn by default and still has moves
         assert_eq!(game.check_king(), KingState::Ok);
@@ -827,7 +863,7 @@ mod tests {
             .pieces
             .insert(human(('K', 6)).unwrap(), Piece::new(King, Black));
 
-        let mut game = Game::from_board(board).expect("Invalid Board ??");
+        let mut game = Game::from_board(board, Side::White, None).expect("Invalid Board ??");
         let white_pawn_origin = human(('J', 1)).unwrap();
         let white_pawn_destination = human(('J', 3)).unwrap();
         let black_pawn_origin = human(('I', 3)).unwrap();
@@ -867,7 +903,7 @@ mod tests {
             .pieces
             .insert(human(('C', 5)).unwrap(), Piece::new(King, Black));
 
-        let mut game = Game::from_board(board).expect("Invalid board ???");
+        let mut game = Game::from_board(board, Side::White, None).expect("Invalid board ???");
 
         let white_rook_pos = human(('I', 4)).unwrap();
 

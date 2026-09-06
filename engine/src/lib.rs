@@ -4,14 +4,13 @@ use strum::{EnumCount, EnumIter};
 // pub mod api; // todo: uncomment later and adjust api to the code changes
 pub mod board;
 pub mod coordinates;
+/// Terminal and HTML rendering. Not available on wasm: it draws with crossterm.
+#[cfg(not(target_family = "wasm"))]
+pub mod display;
 pub mod game;
 mod movement;
 pub mod piece;
 mod zobrist;
-
-/// Terminal and HTML rendering. Not available on wasm: it draws with crossterm.
-#[cfg(not(target_family = "wasm"))]
-pub mod display;
 
 #[cfg(target_family = "wasm")]
 pub mod wasm;
