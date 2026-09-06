@@ -6,23 +6,28 @@ The current working tree replaces `Game::moves: Vec<GameMove>` with `Game::plays
 (move + hash) and adds a running `Game::position_hash`, updated incrementally through
 `PositionHash::update`.
 
-The per-move XOR bookkeeping and the starting hash are now correct. What is still missing is the
-surrounding state: `undo` never rolls the hash back, `with_active_side` changes the turn behind its
-back, and the en-passant component is not maintained at all.
+The per-move XOR bookkeeping, the starting hash and `undo` are now correct. What is still missing
+is the surrounding state: `with_active_side` changes the turn behind the hash's back, and the
+en-passant component is not maintained at all.
 
 Goal: `position_hash == PositionHash::from_board(&board, active_side, en_passant_field)` at every
 point, including after `undo`.
 
 ## Status (checked 2026-09-06)
 
-`cargo test -p engine`: **26 passed, 1 failed** — only `test_undo`, and it fails precisely on
-defect 5. The board, `active_side` and `plays` all roll back correctly; `position_hash` stays at
-`2615503373617392328` (the undone move) where `plays.last().hash` holds the right value
-`3327352855844704476`. Since `Game` derives `Serialize` and `position_hash` is a serialized field,
-the test's JSON round-trip comparison is already a hash-consistency check on `undo`.
+`cargo test -p engine`: **27 passed, 0 failed** — green for the first time. `undo` now restores
+`plays.last().hash`, falling back to the new write-once `position_hash_initial` field when the
+stack empties, so `Play::hash` keeps meaning "the position this play produced".
 
-No test compares `position_hash` against a freshly computed `from_board`, which is why defects 6
-and 8 are both invisible to the suite.
+A green suite is weaker evidence than it looks here: no test compares `position_hash` against a
+freshly computed `from_board`, which is why defects 6 and 8 both survive it. `test_undo` catches
+`undo` only because `Game` derives `Serialize` and `position_hash` is a serialized field, so its
+JSON round-trip comparison happens to cover the hash.
+
+`cargo clippy -p engine` reports three warnings, all pre-existing and none load-bearing: an unused
+`BLACK_/WHITE_PAWNS_PROMOTION_POSITIONS` import left over from moving that test into
+`GameMove::does_promote`, a `clone_on_copy` on `position_hash.clone()` at `game.rs:140`, and a
+`let...else` in `get_en_passant_field` that could be `?`.
 
 ## Defects
 
@@ -30,10 +35,9 @@ Numbering is stable across revisions; resolved entries have been dropped, so the
 
 | # | Where | Problem |
 |---|-------|---------|
-| 5 | `game.rs:415` | `undo` rolls back the board, `active_side` and `state`, but not `position_hash`; `Play::hash` is stored and never read. The one failing test. |
 | 6 | `game.rs:247`, `zobrist.rs:135` | En-passant component never updated incrementally. `update_en_passant` has no non-test caller (warning masked by `#![allow(unused)]` at `zobrist.rs:1`). Positions differing only in en-passant availability collide, and the `en_passant_field` handed to `from_board` is never stored, so it is never cleared from the hash either. |
 | 7 | `game.rs:172`, `lib.rs:13` | `plays()` returns `&[Play]` with private fields and no accessors, and `PositionHash` sits behind a private `mod zobrist` — history and hash are unusable outside the crate. There is no `position_hash()` accessor at all. `api.rs` still calls `game.moves()` (603/606/618/639); no compile error only because it is commented out of `lib.rs`. |
-| 8 | `game.rs:348` | `with_active_side` assigns `active_side` and calls `update_state`, but never toggles the side key. Handing the turn over this way — which `test_stale_mate_on_setup` does twice — silently desynchronises the hash from the position. |
+| 8 | `game.rs:348` | `with_active_side` assigns `active_side` and calls `update_state`, but never toggles the side key. Handing the turn over this way — which `test_stale_mate_on_setup` does twice — silently desynchronises the hash from the position. It must also refresh `position_hash_initial`, or undoing back to an empty stack restores a hash built from the *original* `active_player`. |
 
 `lib.rs` is otherwise only a module reordering — no issue.
 
@@ -53,9 +57,8 @@ Numbering is stable across revisions; resolved entries have been dropped, so the
 - New field `en_passant_field: Option<Position>`, initialised from `from_board`'s parameter;
   `get_en_passant_field()` becomes the *recompute* after a move. Fixes the constructor case where an
   en-passant field is supplied while `plays` is empty.
-- New field `initial_hash: PositionHash`, so `undo` can restore when the stack empties.
 - `with_active_side`: `if side != self.active_side { self.position_hash.toggle_player() }` before
-  the assignment (defect 8).
+  the assignment, and refresh `position_hash_initial` alongside it (defect 8).
 
 `make_move` keeps its current shape; only the hash block changes:
 
@@ -78,15 +81,11 @@ is the one case where the position changes without the turn changing.
 `promote()`: `update(&game_move)` then `toggle_player()`, which is what its current
 `update(&game_move, true)` already does. Push the updated `Play` as above.
 
-`undo()`, after `board.undo(&play.game_move)`:
+`undo()` already restores the hash correctly. It gains one line for the en-passant field:
 
 ```rust
-self.position_hash = self.plays.last().map(|p| p.hash).unwrap_or(self.initial_hash);
 self.en_passant_field = self.get_en_passant_field();
 ```
-
-Restoring the stored hash beats replaying XORs and makes `Play::hash` load-bearing. This alone
-turns `test_undo` green.
 
 ### Accessors (defect 7)
 

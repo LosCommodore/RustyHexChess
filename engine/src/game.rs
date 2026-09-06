@@ -91,6 +91,7 @@ pub struct Game {
     active_side: Side,
     plays: Vec<Play>,
     position_hash: PositionHash,
+    position_hash_initial: PositionHash,
     state: GameState,
 }
 
@@ -136,6 +137,7 @@ impl Game {
         let mut game = Game {
             board,
             position_hash,
+            position_hash_initial: position_hash.clone(),
             active_side: active_player,
             plays: Vec::new(),
             state: GameState::Normal,
@@ -418,6 +420,13 @@ impl Game {
         };
 
         self.board.undo(&play.game_move);
+
+        // The GameMove stores the hash after the move, so we have to go back once more
+        self.position_hash = self
+            .plays
+            .last()
+            .map(|x| x.hash)
+            .unwrap_or(self.position_hash_initial);
 
         // Whoever played the undone move is on turn again. For a promotion that
         // is the pawn's side, since `promote` records the pawn as the moved piece.
