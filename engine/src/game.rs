@@ -131,12 +131,12 @@ impl Game {
             ));
         }
 
-        let position_hash = PositionHash::from_board(&board, active_player, en_passant_field);
+        let position_hash = PositionHash::from_board(&board, !active_player, en_passant_field);
 
         let mut game = Game {
             board,
             position_hash,
-            active_side: Side::Black,
+            active_side: Side::White,
             plays: Vec::new(),
             state: GameState::Normal,
         };
@@ -392,33 +392,22 @@ impl Game {
             return Err(UserError::WrongGameState(self.state));
         }
         let game_move = self.validate_move(origin, destination)?;
-        // -- Normal move logic
-        self.board.execute(&game_move);
+        let does_promote = game_move.does_promote();
 
-        let is_promote_move = matches!(game_move.action, Action::Promote { .. });
-        self.position_hash.update(&game_move, !is_promote_move);
-        let play = Play {
+        self.board.execute(&game_move);
+        self.position_hash.update(&game_move, !does_promote);
+
+        self.plays.push(Play {
             game_move: game_move.clone(),
             hash: self.position_hash,
-        };
-        self.plays.push(play);
+        });
 
-        // -- Promotion logic
-        if game_move.piece.piece_type == PieceType::Pawn {
-            let promotion_fields = match game_move.piece.side {
-                Side::Black => &BLACK_PAWNS_PROMOTION_POSITIONS,
-                Side::White => &WHITE_PAWNS_PROMOTION_POSITIONS,
-            };
-
-            if promotion_fields.contains(&destination) {
-                // The mover stays on turn until they pick a piece; `promote`
-                // ends the turn for them.
-                self.state = GameState::Promotion;
-                return Ok(());
-            }
+        if does_promote {
+            self.state = GameState::Promotion;
+        } else {
+            self.next_turn();
         }
 
-        self.next_turn();
         Ok(())
     }
 

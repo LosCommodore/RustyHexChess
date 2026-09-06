@@ -7,6 +7,9 @@ use super::piece::Piece;
 use std::collections::BTreeMap;
 
 use crate::movement::pawn_capture_moves;
+use crate::piece::BLACK_PAWNS_PROMOTION_POSITIONS;
+use crate::piece::PieceType;
+use crate::piece::WHITE_PAWNS_PROMOTION_POSITIONS;
 use crate::piece::pawn_starting_positions;
 use crate::{
     Side,
@@ -68,6 +71,21 @@ pub enum Capability {
     Both,
     Capture,
     Move,
+}
+
+impl GameMove {
+    pub fn does_promote(&self) -> bool {
+        if self.piece.piece_type == PieceType::Pawn {
+            let promotion_fields = match self.piece.side {
+                Side::Black => &BLACK_PAWNS_PROMOTION_POSITIONS,
+                Side::White => &WHITE_PAWNS_PROMOTION_POSITIONS,
+            };
+
+            promotion_fields.contains(&self.destination)
+        } else {
+            false
+        }
+    }
 }
 
 impl Board {
