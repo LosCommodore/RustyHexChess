@@ -1,5 +1,3 @@
-#![allow(unused)]
-
 // Board states:
 // 91 Fields * 6 Figures * 2 Colors + 91 en_passant + 1 active player
 
@@ -132,7 +130,7 @@ impl PositionHash {
     ///
     /// Undo needs no separate path: XOR is its own inverse, so replaying the
     /// same two fields the other way round restores the old hash exactly.
-    fn update_en_passant(&mut self, old: Option<Position>, new: Option<Position>) {
+    pub fn update_en_passant(&mut self, old: Option<Position>, new: Option<Position>) {
         if old == new {
             return;
         }
@@ -144,7 +142,7 @@ impl PositionHash {
         }
     }
 
-    pub fn update(&mut self, game_move: &GameMove, change_player: bool) {
+    pub fn update_move(&mut self, game_move: &GameMove, change_player: bool) {
         match game_move.action {
             Action::Move => {
                 self.update_piece(game_move.origin, &game_move.piece);

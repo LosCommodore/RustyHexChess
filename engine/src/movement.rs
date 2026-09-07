@@ -181,3 +181,12 @@ pub const fn pawn_capture_moves(color: Side) -> &'static [(isize, isize); 2] {
         Side::Black => &[(-1, 0), (1, -1)],
     }
 }
+
+// Direction for calculation en passant, has to be from the capturing field back to the pawn
+// So the direction is inverse to "fn pawn_capture moves"
+pub const fn pawn_capture_moves_reversed(color: Side) -> &'static [(isize, isize); 2] {
+    match color {
+        Side::White => &[(-1, 0), (1, -1)],
+        Side::Black => &[(1, 0), (-1, 1)],
+    }
+}

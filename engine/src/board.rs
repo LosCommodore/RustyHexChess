@@ -7,6 +7,7 @@ use super::piece::Piece;
 use std::collections::BTreeMap;
 
 use crate::movement::pawn_capture_moves;
+use crate::movement::pawn_capture_moves_reversed;
 use crate::piece::BLACK_PAWNS_PROMOTION_POSITIONS;
 use crate::piece::PieceType;
 use crate::piece::WHITE_PAWNS_PROMOTION_POSITIONS;
@@ -20,17 +21,14 @@ use crate::{
 #[non_exhaustive]
 #[derive(Debug, Error)]
 pub enum MoveError {
-    #[error("Given position {0} is outside of the board")]
-    OutsideBoard(Position),
+    #[error("Given position y: {y} / x:{x} invalid")]
+    InvalidPosition { y: usize, x: usize },
 
     #[error("no piece at position: {0}")]
     NoPieceAtPosition(Position),
 
     #[error("destination is not reachable")]
     IllegalMove,
-
-    #[error("invalid position")]
-    InvalidPosition,
 }
 
 type Result<T> = std::result::Result<T, MoveError>;
@@ -86,6 +84,14 @@ impl GameMove {
             false
         }
     }
+
+    pub fn is_en_passant(&self) -> bool {
+        if let Action::Capture { pos, .. } = self.action {
+            pos != self.destination
+        } else {
+            false
+        }
+    }
 }
 
 impl Board {
@@ -123,7 +129,8 @@ impl Board {
         y = y.checked_add_signed(dy)?;
         x = x.checked_add_signed(dx)?;
 
-        let destination = Position::new(y, x).ok()?;
+        let destination = Position::new(y, x)?;
+
         if let Some(enemy_piece) = self.pieces.get(&destination) {
             if enemy_piece.side() == me.side {
                 return None;
@@ -269,6 +276,58 @@ impl Board {
                     .insert(game_move.destination, game_move.piece.clone());
             }
         }
+    }
+
+    // Get en passant field (the destination where can be captured) for a given game move. Move has to be by a pawn doing two steps
+    pub fn get_en_passant_field(&self, game_move: &GameMove) -> Option<Position> {
+        if game_move.piece.piece_type != PieceType::Pawn {
+            return None;
+        }
+
+        let dx = game_move.destination.coordinates().1 as isize
+            - game_move.origin.coordinates().1 as isize;
+        if dx.abs() < 2 {
+            return None;
+        }
+
+        let x = (game_move.origin.pos().1 as isize + dx.signum()) as usize;
+        Some(Position::new(game_move.origin.pos().0, x).expect("Invalid position ???"))
+    }
+
+    // Get en passant game moves for a given board position
+    pub fn get_en_passant_moves(&self, active_player: Side, last_move: &GameMove) -> Vec<GameMove> {
+        let mut game_moves = Vec::new();
+
+        let Some(en_passant_pos) = self.get_en_passant_field(last_move) else {
+            return game_moves;
+        };
+
+        for (dy, dx) in pawn_capture_moves_reversed(active_player) {
+            let Some(possible_pawn_pos) = en_passant_pos.add(*dy, *dx) else {
+                continue;
+            };
+
+            let Some(piece) = self.pieces.get(&possible_pawn_pos) else {
+                continue;
+            };
+
+            if piece.piece_type != PieceType::Pawn || piece.side != active_player {
+                continue;
+            }
+
+            let new_move = GameMove {
+                piece: piece.clone(),
+                origin: possible_pawn_pos,
+                destination: en_passant_pos,
+                action: Action::Capture {
+                    enemy: last_move.piece.clone(),
+                    pos: last_move.destination,
+                },
+            };
+
+            game_moves.push(new_move);
+        }
+        game_moves
     }
 }
 

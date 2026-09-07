@@ -6,12 +6,8 @@ use std::{
 use crate::{Side, board, zobrist::PositionHash};
 use crate::{
     board::{Action, Board, GameMove, MoveError},
-    coordinates::{self, HumanNotation, Position},
-    movement::pawn_capture_moves,
-    piece::{
-        BLACK_PAWNS_PROMOTION_POSITIONS, Piece, PieceType, WHITE_PAWNS_PROMOTION_POSITIONS,
-        get_startup_pieces_black, get_startup_pieces_white,
-    },
+    coordinates::{HumanNotation, Position},
+    piece::{Piece, PieceType, get_startup_pieces_black, get_startup_pieces_white},
 };
 use serde::Serialize;
 
@@ -21,8 +17,11 @@ pub enum UserError {
     #[error(transparent)]
     MoveError(#[from] board::MoveError),
 
-    #[error(transparent)]
-    CoordinateError(#[from] coordinates::CoordinateError),
+    #[error("This position is outside the board: x={x}, y={y}")]
+    OutsideBoard { y: usize, x: usize },
+
+    #[error("This notation is invalid: {0:?}")]
+    InvalidHumanNotation(HumanNotation),
 
     #[error("piece belongs to the other player")]
     WrongPlayer,
@@ -232,82 +231,17 @@ impl Game {
     // Get valid movement options for a piece at a given position.
     pub fn get_movement_options(&mut self, pos: Position) -> Result<Vec<GameMove>> {
         let mut mv = self.board.get_movement_options(pos)?;
-        let p = self
-            .board
-            .pieces
-            .get(&pos)
-            .expect("No piece? Function should already have returned with an error");
 
-        if p.piece_type == PieceType::Pawn {
-            mv.extend(self.get_en_passant_moves(&pos, p));
+        if let Some(Play {
+            game_move: last_move,
+            ..
+        }) = self.plays.last()
+        {
+            mv.extend(self.board.get_en_passant_moves(self.active_side, last_move));
         }
 
         mv.retain(|x| !self.move_leaves_king_in_check(x));
         Ok(mv)
-    }
-
-    fn get_en_passant_field(&self) -> Option<Position> {
-        let Some(last) = self.plays.last() else {
-            return None;
-        };
-
-        if last.game_move.piece.piece_type != PieceType::Pawn {
-            return None;
-        }
-
-        let dx = last.game_move.destination.coordinates().1 as isize
-            - last.game_move.origin.coordinates().1 as isize;
-        if dx.abs() < 2 {
-            return None;
-        }
-
-        let x = (last.game_move.origin.pos().1 as isize + dx.signum()) as usize;
-        Some(Position::new(last.game_move.origin.pos().0, x).expect("Invalid position ???"))
-    }
-
-    // Get en_passant_moves for an existing pawn at the given position
-    fn get_en_passant_moves(&self, pos: &Position, pawn: &Piece) -> Vec<GameMove> {
-        let Some(en_passant_pos) = self.get_en_passant_field() else {
-            return Vec::new();
-        };
-
-        let last = self
-            .plays
-            .last()
-            .expect("No last game move? Should not be possible here");
-
-        // -- Check if given pawn can capture en passant
-        let capture_moves = pawn_capture_moves(pawn.side);
-        let mut moves = Vec::new();
-
-        for (dy, dx) in capture_moves {
-            let (y, x) = pos.coordinates();
-            let y = y.checked_add_signed(*dy);
-            let x = x.checked_add_signed(*dx);
-
-            let (Some(y), Some(x)) = (y, x) else {
-                continue;
-            };
-            let Ok(destination) = Position::new(y, x) else {
-                continue;
-            };
-
-            if destination == en_passant_pos {
-                let new_move = GameMove {
-                    piece: pawn.clone(),
-                    origin: *pos,
-                    destination,
-                    action: Action::Capture {
-                        enemy: last.game_move.piece.clone(),
-                        pos: last.game_move.destination,
-                    },
-                };
-
-                moves.push(new_move);
-            }
-        }
-
-        moves
     }
 
     pub fn check_king(&mut self) -> KingState {
@@ -361,8 +295,10 @@ impl Game {
         origin: HumanNotation,
         destination: HumanNotation,
     ) -> Result<()> {
-        let origin = Position::from_human(origin)?;
-        let destination = Position::from_human(destination)?;
+        let origin = Position::from_human(origin).ok_or(UserError::InvalidHumanNotation(origin))?;
+        let destination = Position::from_human(destination)
+            .ok_or(UserError::InvalidHumanNotation(destination))?;
+
         self.make_move(origin, destination)
     }
 
@@ -388,6 +324,22 @@ impl Game {
         Ok(option)
     }
 
+    pub fn en_passant_possible(&mut self, player: Side) -> Option<Position> {
+        let play = self.plays().last()?;
+
+        let mvs = self.board.get_en_passant_moves(player, &play.game_move);
+        let mvs: Vec<_> = mvs
+            .iter()
+            .filter(|mv| !self.move_leaves_king_in_check(mv))
+            .collect();
+
+        if mvs.len() > 0 {
+            Some(mvs[0].destination)
+        } else {
+            None
+        }
+    }
+
     /// Make a move on the board. Move must be valid, otherwise an error will be returned
     pub fn make_move(&mut self, origin: Position, destination: Position) -> Result<()> {
         if !matches!(self.state, GameState::Normal) {
@@ -396,13 +348,19 @@ impl Game {
         let game_move = self.validate_move(origin, destination)?;
         let does_promote = game_move.does_promote();
 
-        self.board.execute(&game_move);
-        self.position_hash.update(&game_move, !does_promote);
+        let old_en_passant = self.en_passant_possible(self.active_side);
 
+        self.board.execute(&game_move);
         self.plays.push(Play {
             game_move: game_move.clone(),
             hash: self.position_hash,
         });
+
+        let new_en_passant = self.en_passant_possible(!self.active_side);
+
+        self.position_hash.update_move(&game_move, !does_promote);
+        self.position_hash
+            .update_en_passant(old_en_passant, new_en_passant);
 
         if does_promote {
             self.state = GameState::Promotion;
@@ -468,7 +426,7 @@ impl Game {
             action: Action::Promote { to: new_piece },
         };
 
-        self.position_hash.update(&game_move, true);
+        self.position_hash.update_move(&game_move, true);
 
         let hash = self.position_hash;
         self.plays.push(Play { game_move, hash });

@@ -1,18 +1,5 @@
 use serde::Serialize;
 use std::fmt::{self};
-use thiserror::Error;
-
-#[non_exhaustive]
-#[derive(Debug, Error)]
-pub enum CoordinateError {
-    #[error("This position is outside the board: x={x}, y={y}")]
-    OutsideBoard { y: usize, x: usize },
-
-    #[error("This position is invalid: x={x}, y={y}")]
-    InvalidHumanNotation { y: char, x: usize },
-}
-
-type Result<T> = std::result::Result<T, CoordinateError>;
 
 pub type HumanNotation = (char, usize); // (a..k | A..K , 1..11)
 
@@ -44,26 +31,24 @@ pub struct Position {
 
 impl Position {
     /// Creates a Position form a human notation
-    pub fn from_human((y_human, x_human): HumanNotation) -> Result<Self> {
-        let error = || CoordinateError::InvalidHumanNotation {
-            y: y_human,
-            x: x_human,
-        };
-
-        let y = char_to_num_notation(y_human).ok_or(error())?;
-
-        let Some(x) = x_human.checked_sub(1) else {
-            return Err(error());
-        };
-
+    pub fn from_human((y_human, x_human): HumanNotation) -> Option<Self> {
+        let y = char_to_num_notation(y_human)?;
+        let x = x_human.checked_sub(1)?;
         Self::new(y, x)
     }
 
-    pub fn new(y: usize, x: usize) -> Result<Self> {
+    pub fn add(self, dy: isize, dx: isize) -> Option<Self> {
+        let y = self.y.checked_add_signed(dy)?;
+        let x = self.x.checked_add_signed(dx)?;
+
+        Position::new(y, x)
+    }
+
+    pub fn new(y: usize, x: usize) -> Option<Self> {
         if !is_on_board(y, x) {
-            return Err(CoordinateError::OutsideBoard { y, x });
+            return None;
         }
-        Ok(Self { y, x })
+        Some(Self { y, x })
     }
 
     pub(crate) const fn new_const(y: usize, x: usize) -> Self {
@@ -180,7 +165,7 @@ mod tests {
     #[test]
     fn ids_are_unique_and_dense() {
         let all: Vec<Position> = (0..BOARD_DIM)
-            .flat_map(|y| (0..BOARD_DIM).filter_map(move |x| Position::new(y, x).ok()))
+            .flat_map(|y| (0..BOARD_DIM).filter_map(move |x| Position::new(y, x)))
             .collect();
 
         assert_eq!(all.len(), NR_FIELDS, "the board has 91 fields");
