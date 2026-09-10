@@ -1,7 +1,4 @@
-use std::{
-    collections::{HashMap, HashSet},
-    ops::Not,
-};
+use std::collections::{HashMap, HashSet};
 
 use crate::{Side, board, zobrist::PositionHash};
 use crate::{
@@ -91,6 +88,7 @@ pub struct Game {
     plays: Vec<Play>,
     position_hash: PositionHash,
     position_hash_initial: PositionHash,
+    en_passant_field_initial: Option<Position>,
     state: GameState,
 }
 
@@ -137,6 +135,7 @@ impl Game {
             board,
             position_hash,
             position_hash_initial: position_hash.clone(),
+            en_passant_field_initial: en_passant_field,
             active_side: active_player,
             plays: Vec::new(),
             state: GameState::Normal,
@@ -206,7 +205,7 @@ impl Game {
         is_check
     }
 
-    pub fn move_leaves_king_in_check(&mut self, mv: &GameMove) -> bool {
+    pub fn leaves_king_in_check(&mut self, mv: &GameMove) -> bool {
         self.board.execute(mv);
         let check = self.king_in_check(mv.piece.side);
         self.board.undo(mv);
@@ -228,19 +227,34 @@ impl Game {
         false
     }
 
+    // Get en_passant_moves and filter out pinned pieces
+    fn get_en_passant_moves(&mut self, active_player: Side) -> Vec<GameMove> {
+        let en_passant_field = match self.plays.last() {
+            Some(Play {
+                game_move: last_move,
+                ..
+            }) => self.board.get_en_passant_field(last_move),
+            None => self.en_passant_field_initial,
+        };
+
+        let Some(field) = en_passant_field else {
+            return Vec::new();
+        };
+
+        self.board
+            .get_en_passant_moves(active_player, field)
+            .expect("En passant field not valid ???")
+            .into_iter()
+            .filter(|x| !self.leaves_king_in_check(x))
+            .collect()
+    }
+
     // Get valid movement options for a piece at a given position.
     pub fn get_movement_options(&mut self, pos: Position) -> Result<Vec<GameMove>> {
         let mut mv = self.board.get_movement_options(pos)?;
+        mv.retain(|x| !self.leaves_king_in_check(x));
 
-        if let Some(Play {
-            game_move: last_move,
-            ..
-        }) = self.plays.last()
-        {
-            mv.extend(self.board.get_en_passant_moves(self.active_side, last_move));
-        }
-
-        mv.retain(|x| !self.move_leaves_king_in_check(x));
+        mv.extend(self.get_en_passant_moves(self.active_side));
         Ok(mv)
     }
 
@@ -324,20 +338,9 @@ impl Game {
         Ok(option)
     }
 
-    pub fn en_passant_possible(&mut self, player: Side) -> Option<Position> {
-        let play = self.plays().last()?;
-
-        let mvs = self.board.get_en_passant_moves(player, &play.game_move);
-        let mvs: Vec<_> = mvs
-            .iter()
-            .filter(|mv| !self.move_leaves_king_in_check(mv))
-            .collect();
-
-        if mvs.len() > 0 {
-            Some(mvs[0].destination)
-        } else {
-            None
-        }
+    // Returns the validated en passant field (not pinned)
+    fn get_valid_en_passant_field(&mut self, side: Side) -> Option<Position> {
+        Some(self.get_en_passant_moves(side).get(0)?.destination)
     }
 
     /// Make a move on the board. Move must be valid, otherwise an error will be returned
@@ -348,7 +351,7 @@ impl Game {
         let game_move = self.validate_move(origin, destination)?;
         let does_promote = game_move.does_promote();
 
-        let old_en_passant = self.en_passant_possible(self.active_side);
+        let old_en_passant = self.get_valid_en_passant_field(self.active_side);
 
         self.board.execute(&game_move);
         self.plays.push(Play {
@@ -356,7 +359,7 @@ impl Game {
             hash: self.position_hash,
         });
 
-        let new_en_passant = self.en_passant_possible(!self.active_side);
+        let new_en_passant = self.get_valid_en_passant_field(!self.active_side);
 
         self.position_hash.update_move(&game_move, !does_promote);
         self.position_hash
@@ -434,17 +437,6 @@ impl Game {
         self.state = GameState::Normal;
         self.next_turn();
         Ok(())
-    }
-}
-
-impl Not for Side {
-    type Output = Self;
-
-    fn not(self) -> Self::Output {
-        match self {
-            Side::White => Side::Black,
-            Side::Black => Side::White,
-        }
     }
 }
 

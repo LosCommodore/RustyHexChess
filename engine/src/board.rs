@@ -1,10 +1,9 @@
+use super::piece::Piece;
 use serde::Serialize;
 use serde_with::Same;
 use serde_with::serde_as;
-use thiserror::Error;
-
-use super::piece::Piece;
 use std::collections::BTreeMap;
+use thiserror::Error;
 
 use crate::movement::pawn_capture_moves;
 use crate::movement::pawn_capture_moves_reversed;
@@ -294,16 +293,31 @@ impl Board {
         Some(Position::new(game_move.origin.pos().0, x).expect("Invalid position ???"))
     }
 
-    // Get en passant game moves for a given board position
-    pub fn get_en_passant_moves(&self, active_player: Side, last_move: &GameMove) -> Vec<GameMove> {
+    // Get en passant game moves for a given board position. Returns None if en_passant_field is invalid
+    pub fn get_en_passant_moves(
+        &self,
+        active_player: Side,
+        en_passant_field: Position,
+    ) -> Option<Vec<GameMove>> {
         let mut game_moves = Vec::new();
 
-        let Some(en_passant_pos) = self.get_en_passant_field(last_move) else {
-            return game_moves;
-        };
+        let double_move_pawn_pos =
+            get_moved_pawn_position_from_en_passant(en_passant_field, !active_player)?;
+
+        let double_move_pawn = self.pieces.get(&double_move_pawn_pos)?;
+
+        if !matches!(
+            double_move_pawn,
+            Piece {
+                piece_type: PieceType::Pawn,
+                side,
+            } if *side != active_player
+        ) {
+            return None;
+        }
 
         for (dy, dx) in pawn_capture_moves_reversed(active_player) {
-            let Some(possible_pawn_pos) = en_passant_pos.add(*dy, *dx) else {
+            let Some(possible_pawn_pos) = en_passant_field.add(*dy, *dx) else {
                 continue;
             };
 
@@ -318,17 +332,25 @@ impl Board {
             let new_move = GameMove {
                 piece: piece.clone(),
                 origin: possible_pawn_pos,
-                destination: en_passant_pos,
+                destination: en_passant_field,
                 action: Action::Capture {
-                    enemy: last_move.piece.clone(),
-                    pos: last_move.destination,
+                    enemy: double_move_pawn.clone(),
+                    pos: double_move_pawn_pos,
                 },
             };
 
             game_moves.push(new_move);
         }
-        game_moves
+        Some(game_moves)
     }
+}
+
+pub fn get_moved_pawn_position_from_en_passant(
+    en_passant_field: Position,
+    player: Side,
+) -> Option<Position> {
+    let (dy, dx) = player.move_direction();
+    en_passant_field.add(dy, dx)
 }
 
 #[cfg(test)]

@@ -1,4 +1,5 @@
 use serde::Serialize;
+use std::ops::Not;
 use strum::{EnumCount, EnumIter};
 
 // pub mod api; // todo: uncomment later and adjust api to the code changes
@@ -21,4 +22,24 @@ pub enum Side {
     #[default]
     White = 0,
     Black = 1,
+}
+
+impl Side {
+    fn move_direction(&self) -> (isize, isize) {
+        match self {
+            Self::Black => (0, -1),
+            Self::White => (1, 0),
+        }
+    }
+}
+
+impl Not for Side {
+    type Output = Self;
+
+    fn not(self) -> Self::Output {
+        match self {
+            Side::White => Side::Black,
+            Side::Black => Side::White,
+        }
+    }
 }
