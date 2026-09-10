@@ -16,8 +16,13 @@ point, including after `undo`.
 
 ## Status (checked 2026-09-10, working tree on top of `05d6041`)
 
-`cargo test -p engine`: **25 passed, 2 failed** — `test_undo` on defect 9, and `test_en_passant`,
-which now *panics* on defect 11.
+`cargo test` aborts before running, so the last known result stands: **25 passed, 2 failed** —
+`test_undo` on defect 9, and `test_en_passant`, which panics on defect 11.
+
+Defect 7 is resolved: `pub mod zobrist` makes `PositionHash` nameable, `Play`'s fields are public,
+and `update_move`/`update_en_passant` were narrowed to `pub(crate)` so the wider module visibility
+did not hand outside callers the incremental mutators. `from_board` and `hash()` stay `pub`, which
+is the right surface. One small piece is carried into Cleanups below.
 
 The refactor moved the en-passant machinery onto `Board` and got the hard part right:
 
@@ -48,7 +53,6 @@ Numbering is stable across revisions; resolved entries have been dropped, so the
 | # | Where | Problem |
 |---|-------|---------|
 | 6c | `game.rs:134` | Half fixed — `en_passant_field_initial` now feeds move generation. The hash half remains: `from_board` folds the caller's raw `en_passant_field` in, but `old_en_passant` on the first move reads it back through the *validity* filter. Pass a field where no legal capture exists and the two disagree: the key goes in and never comes out. `from_board` has to normalise its parameter through the same test it will later be compared against. |
-| 7 | `game.rs:173`, `lib.rs:13` | `plays()` returns `&[Play]` with private fields and no accessors, and `PositionHash` sits behind a private `mod zobrist` — history and hash are unusable outside the crate. There is no `position_hash()` accessor at all. Now visible as a clippy warning: `PositionHash::hash` is "never used". `api.rs` still calls `game.moves()` (603/606/618/639); no compile error only because it is commented out of `lib.rs`. |
 | 8 | `game.rs:284` | `with_active_side` assigns `active_side` and calls `update_state`, but never toggles the side key. Handing the turn over this way — which `test_stale_mate_on_setup` does twice — silently desynchronises the hash from the position. It must also refresh `position_hash_initial`, or undoing back to an empty stack restores a hash built from the *original* `active_player`. |
 | 9 | `game.rs:354-363`, `game.rs:429-432`, `game.rs:383` | Two conventions for `Play::hash` in one crate. `make_move` pushes *before* `update_move`, so its plays carry the hash of the position played **from** (`plays[0].hash == position_hash_initial` in the `test_undo` output proves it). `promote` still pushes after, and `undo` still walks back to `plays.last()` — both the "position produced" reading. The failing test. |
 | 10 | `game.rs:255-260` | Still open. `get_movement_options(pos)` appends **every** en-passant move available to the side to move, regardless of which piece sits on `pos`. The returned moves have a different `origin` and a different `piece` than the caller asked about. The refactor moved this code but kept the unfiltered `mv.extend(self.get_en_passant_moves(self.active_side))`. |
@@ -136,24 +140,26 @@ before the assignment, and refresh `position_hash_initial` alongside it.
 
 **Defect 13.** Restore the name `move_leaves_king_in_check`.
 
-### Accessors (defect 7)
-
-Add `Play::game_move(&self) -> &GameMove` and `Play::hash(&self) -> PositionHash`, plus
-`Game::position_hash(&self) -> PositionHash`. Make `zobrist` reachable — `pub mod zobrist` or
-`pub use zobrist::PositionHash;` in `lib.rs`. Leave `api.rs` alone (already commented out); note
-that its `moves()` calls need renaming to `plays()` when it is revived.
-
 ### Cleanups
 
 Not defects, but loose ends from the refactor:
 
+- **Delete `use insta::comparator;` at `zobrist.rs:9`** — it breaks the library build (see Status).
+- `Game::position_hash` has no accessor, so the *current* position's hash cannot be read from
+  outside. `plays().last().hash` is not a substitute: it is the wrong end of the move under defect
+  9, and there is nothing there at all before the first move. Add
+  `pub fn position_hash(&self) -> PositionHash`. A method rather than a `pub` field — it is a
+  derived value with an invariant tying it to the board.
+- `Play` could take `#[non_exhaustive]`. Its fields are public, which suits a passive record and
+  matches `GameMove`, but all-public fields also let outside code build a `Play` whose `hash` does
+  not match its `game_move`. Harmless while nothing consumes an externally-built one; worth the
+  attribute before anything like `Game::from_plays` appears.
+- `api.rs` still calls `game.moves()` (603/606/618/639); no compile error only because it is
+  commented out of `lib.rs`. Those need renaming to `plays()` when it is revived.
 - `UserError::OutsideBoard` (`game.rs:21`) is declared and never constructed — `CoordinateError`'s
   removal left it behind.
 - `GameMove::is_en_passant` (`board.rs:88`) has no caller.
-- `Position::pos()` and `Position::coordinates()` are the same function — both return `(y, x)`.
-  `get_en_passant_field` uses both within three lines. Keep one.
-- `cargo clippy`: `clone_on_copy` on `position_hash.clone()` at `game.rs:139` (`PositionHash` is
-  `Copy`), and `get(0)` instead of `first()` in `get_valid_en_passant_field`.
+
 
 ## Verification
 

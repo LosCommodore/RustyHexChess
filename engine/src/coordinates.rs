@@ -67,10 +67,6 @@ impl Position {
         (c, self.x + 1)
     }
 
-    pub fn coordinates(&self) -> (usize, usize) {
-        (self.y, self.x)
-    }
-
     // unique number for each position, 0..91 without gaps.
     // `x` is not zero-based within a row, so the row's first x has to come off.
     pub const fn id(&self) -> usize {

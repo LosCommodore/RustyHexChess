@@ -11,7 +11,7 @@ pub mod display;
 pub mod game;
 mod movement;
 pub mod piece;
-mod zobrist;
+pub mod zobrist;
 
 #[cfg(target_family = "wasm")]
 pub mod wasm;

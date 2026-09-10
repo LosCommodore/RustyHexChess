@@ -283,8 +283,7 @@ impl Board {
             return None;
         }
 
-        let dx = game_move.destination.coordinates().1 as isize
-            - game_move.origin.coordinates().1 as isize;
+        let dx = game_move.destination.pos().1 as isize - game_move.origin.pos().1 as isize;
         if dx.abs() < 2 {
             return None;
         }

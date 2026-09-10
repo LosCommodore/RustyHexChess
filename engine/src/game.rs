@@ -69,8 +69,8 @@ pub struct GameResult {
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct Play {
-    game_move: GameMove,
-    hash: PositionHash,
+    pub game_move: GameMove,
+    pub hash: PositionHash,
 }
 
 #[derive(Copy, Default, Debug, Clone, Serialize)]
@@ -134,7 +134,7 @@ impl Game {
         let mut game = Game {
             board,
             position_hash,
-            position_hash_initial: position_hash.clone(),
+            position_hash_initial: position_hash,
             en_passant_field_initial: en_passant_field,
             active_side: active_player,
             plays: Vec::new(),
@@ -340,7 +340,7 @@ impl Game {
 
     // Returns the validated en passant field (not pinned)
     fn get_valid_en_passant_field(&mut self, side: Side) -> Option<Position> {
-        Some(self.get_en_passant_moves(side).get(0)?.destination)
+        Some(self.get_en_passant_moves(side).first()?.destination)
     }
 
     /// Make a move on the board. Move must be valid, otherwise an error will be returned
