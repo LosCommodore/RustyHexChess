@@ -171,7 +171,7 @@ impl Game {
         let err_msg2 = "No pawn that could have created this en passant";
         let enemy = !self.active_side;
         let (_, dx) = enemy.move_direction();
-        let expected_pawn_pos = field.add(dy, dx).ok_or(err_en_passant(err_msg2))?;
+        let expected_pawn_pos = field.add(0, dx).ok_or(err_en_passant(err_msg2))?;
 
         // 2a - check pawn at destination
         let pawn = self
