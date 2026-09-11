@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
+use crate::piece::PieceType::Pawn;
 use crate::piece::pawn_starting_positions;
 use crate::{Side, board, zobrist::PositionHash};
 use crate::{
@@ -261,7 +262,7 @@ impl Game {
         is_check
     }
 
-    pub fn leaves_king_in_check(&mut self, mv: &GameMove) -> bool {
+    pub fn move_leaves_king_in_check(&mut self, mv: &GameMove) -> bool {
         self.board.execute(mv);
         let check = self.king_in_check(mv.piece.side);
         self.board.undo(mv);
@@ -301,16 +302,28 @@ impl Game {
             .get_en_passant_moves(active_player, field)
             .expect("En passant field not valid ???")
             .into_iter()
-            .filter(|x| !self.leaves_king_in_check(x))
+            .filter(|x| !self.move_leaves_king_in_check(x))
             .collect()
     }
 
     // Get valid movement options for a piece at a given position.
     pub fn get_movement_options(&mut self, pos: Position) -> Result<Vec<GameMove>> {
         let mut mv = self.board.get_movement_options(pos)?;
-        mv.retain(|x| !self.leaves_king_in_check(x));
+        mv.retain(|x| !self.move_leaves_king_in_check(x));
 
-        mv.extend(self.get_en_passant_moves(self.active_side));
+        if matches!(
+            self.board.pieces.get(&pos),
+            Some(&Piece {
+                piece_type: Pawn,
+                ..
+            })
+        ) {
+            let en = self.get_en_passant_moves(self.active_side);
+            if let Some(move_) = en.iter().find(|x| x.origin == pos) {
+                mv.push(move_.clone());
+            }
+        }
+
         Ok(mv)
     }
 

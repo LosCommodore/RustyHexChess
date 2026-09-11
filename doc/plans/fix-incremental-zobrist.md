@@ -37,36 +37,38 @@ Numbering is stable across revisions; resolved entries have been dropped, so the
 
 | # | Where | Problem |
 |---|-------|---------|
-| 10 | `game.rs:309-315` | `get_movement_options(pos)` appends **every** en-passant move available to the side to move, regardless of which piece sits on `pos`. The returned moves have a different `origin` and a different `piece` than the caller asked about. Detail below. |
 | 11 | `lib.rs:28-33` | `Side::move_direction()` returns `(1, 0)` for White — the wrong axis, and in fact one of White's *capture* directions (`pawn_capture_moves(White) == [(1,0), (-1,1)]`). Pawns advance along **x**: `get_pawn_moves` builds `(0, orientation)` (`board.rs:169-170`) and `get_en_passant_field` moves `origin.x` holding `y` fixed. Black's `(0, -1)` is right; White's should be `(0, 1)`. `get_moved_pawn_position_from_en_passant` therefore looks for the double-stepped white pawn on the wrong square and `Board::get_en_passant_moves` returns `None`. Pre-existing on `main`, not from the refactor. |
-| 13 | `game.rs:264` | Restore the name `move_leaves_king_in_check`. |
-| 14 | `game.rs:400-414` | `get_valid_en_passant_field` reads `self.plays.last()`. Moving the push to the end left `new_en_passant` at `game.rs:404` reading the **previous** move against an already-executed board. Detail below. |
-| 16 | `game.rs:173-174, 188` | `let (_, dx) = enemy.move_direction();` with `field.add(0, dx)` works around defect 11 by discarding `dy`. It does not help: for White `move_direction` is `(1, 0)`, so `dx == 0` and `expected_pawn_pos == field` — which check (1) has just proved empty, so check 2a always fails. |
-
-### Defect 10 in detail
-
-A correctness bug in play, not just in the hash.
-
-`validate_move` picks its move with `options.iter().find(|o| o.destination == destination)`, never
-checking that the chosen option belongs to the piece at `origin`. So: White double-pushes, creating
-en-passant field `F` that a Black pawn can take. Black asks to move some *other* piece — a rook, the
-king — to `F`. That piece cannot reach `F`, but the appended en-passant list offers a move there
-anyway; `find` matches the pawn's capture and executes it while the rook never moves. The engine
-silently plays a different move than the one requested.
+| 13 | `game.rs:265` | Restore the name `move_leaves_king_in_check`. |
+| 14 | `game.rs:413-427` | `get_valid_en_passant_field` reads `self.plays.last()`. Moving the push to the end left `new_en_passant` at `game.rs:417` reading the **previous** move against an already-executed board. **Playing any en passant panics through the public API today.** Detail below. |
+| 16 | `game.rs:174-175, 189` | `let (_, dx) = enemy.move_direction();` with `field.add(0, dx)` works around defect 11 by discarding `dy`. It does not help: for White `move_direction` is `(1, 0)`, so `dx == 0` and `expected_pawn_pos == field` — which check (1) has just proved empty, so check 2a always fails. |
 
 ### Defect 14 in detail
 
-`Game::get_en_passant_moves` (`game.rs:287-306`) derives its field from `self.plays.last()`, falling
-back to `en_passant_field_initial`. `make_move` reads it twice: `old_en_passant` (`game.rs:400`,
-before `board.execute`) is fine either way, but `new_en_passant` (`game.rs:404`) must describe the
-move *just made* — and with the push at `game.rs:414`, `plays.last()` is still the previous move
+`Game::get_en_passant_moves` (`game.rs:288-307`) derives its field from `self.plays.last()`, falling
+back to `en_passant_field_initial`. `make_move` reads it twice: `old_en_passant` (`game.rs:413`,
+before `board.execute`) is fine either way, but `new_en_passant` (`game.rs:417`) must describe the
+move *just made* — and with the push at `game.rs:427`, `plays.last()` is still the previous move
 against an already-mutated board. It records a stale ep key, or panics at the `expect`.
 
-In `test_en_passant`: Black answers the double push with the en-passant capture, `new_en_passant`
-re-derives White's old field J2, looks for the white pawn behind it — just captured — and feeds
-`None` into `game.rs:302`. Confirmed by experiment: with defect 11 patched it still panics there;
-additionally restoring the old push order makes it pass and `test_undo` fail again. Ordering alone
-cannot satisfy both — the history read has to go.
+**Playing an en passant panics, reachable from the public API with nothing else patched.** Set up a
+position by hand with a legal en passant — Black B11→B9, ep field B10, a White pawn on C9 — and play
+it:
+
+```
+game.make_move(C9, B10)  ->  panicked at 'En passant field not valid ???', game.rs:303
+```
+
+`make_move` executes the capture, then reads `new_en_passant` before the push. With an empty history
+that falls back to `en_passant_field_initial`, still B10, and looks for the pawn behind it — the one
+the capture just removed. `Board::get_en_passant_moves` returns `None` into the `expect`. Use this
+as the regression test: it is a plain sequence of public calls, unlike the `test_en_passant` path
+below, which only reaches line 303 once defect 11 is fixed.
+
+`test_en_passant` is the second reproduction: Black answers the double push with the en-passant
+capture, `new_en_passant` re-derives White's old field J2, looks for the white pawn behind it — just
+captured — and feeds `None` into the same `expect`. Confirmed by experiment: with defect 11 patched
+it still panics there; additionally restoring the old push order makes it pass and `test_undo` fail
+again. Ordering alone cannot satisfy both — the history read has to go.
 
 ## Fix
 
@@ -95,12 +97,6 @@ use it too (`board.rs:169-170` builds the same value inline), so there is one de
 **Defect 16.** With 11 fixed, restore both components: `let (dy, dx) = enemy.move_direction();`,
 `field.add(dy, dx)` for the pawn and `field.add(-dy, -dx)` for its origin. The current
 `field.add(0, -1 * dx)` is also a clippy `neg_multiply` — the one warning the lib emits today.
-
-**Defect 10.** Filter the appended en-passant moves by `origin == pos`. `get_valid_en_passant_field`
-is the other caller of `Game::get_en_passant_moves` and wants the unfiltered list, so the filter
-belongs at the `get_movement_options` end, not inside the helper.
-
-**Defect 13.** Restore the name `move_leaves_king_in_check`.
 
 ### Cleanups
 
@@ -131,9 +127,12 @@ belongs at the `get_movement_options` end, not inside the helper.
   assertion for `Game::new()`, for `from_board(.., Side::Black, ..)`, and for
   `from_board(.., Some(field))` followed by one unrelated move. Nothing checks a freshly constructed
   game today, which is how the old inverted starting hash went unnoticed through a green suite.
-- Defect 10: after a double push a pawn can answer, assert `get_movement_options(pos)` returns only
-  moves with `origin == pos`, and that `make_move(other_piece, en_passant_field)` is rejected.
+- **Lock in the `get_movement_options` fix**, which has none: in a position with a live en passant,
+  assert `get_movement_options(pos)` returns only moves with `origin == pos` for *every* piece of
+  the side to move, and that `make_move(rook, en_passant_field)` is `Err(IllegalMove)` rather than
+  silently playing the pawn's capture.
 - Defect 11: `test_en_passant` covers a White double push; add the Black mirror.
-- Defect 14: the ep capture in `test_en_passant` is the regression test — it panics today. Add a
+- Defect 14: the hand-set-up repro above — `from_board` with a legal ep field, then `make_move` of
+  the capture — panics today and needs nothing else fixed first, so it is the regression test. Add a
   transposition check too: two move orders reaching the same position hash equal, and move-then-undo
   returns the exact prior hash.
