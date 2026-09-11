@@ -28,7 +28,7 @@ impl Side {
     fn move_direction(&self) -> (isize, isize) {
         match self {
             Self::Black => (0, -1),
-            Self::White => (1, 0),
+            Self::White => (0, 1),
         }
     }
 }

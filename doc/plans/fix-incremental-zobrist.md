@@ -8,41 +8,26 @@ point, including after `undo`.
 Engine only — `board.rs`, `game.rs`, `zobrist.rs`, `lib.rs`. **`api.rs` and `wasm.rs` are parked**
 until the engine is finished: `api.rs` is commented out of `lib.rs` (`lib.rs:5`), `wasm.rs` depends
 on it, so neither is compiled or type-checked and both have drifted from current signatures. They
-do not count as callers when judging whether an engine change is safe, and they get one deliberate
-pass at the end rather than piecemeal fixes now.
+do not count as callers when judging whether an engine change is safe.
 
-## Status (2026-09-11, working tree on top of `13d3b3f`)
+## Status (2026-09-11, working tree on top of `2de920c`)
 
-`cargo test -p engine`: **26 passed, 1 failed** — `test_en_passant`, panicking at `game.rs:302`.
+`cargo test -p engine`: **26 passed, 1 failed** — `test_en_passant`, panicking at `game.rs:303` on
+defect 14, which is the only defect left.
 
 The XOR bookkeeping, the starting hash, `undo`'s restore, the en-passant semantics and the
-`Play::hash` convention ("the position this play produced") are right. What remains is plumbing.
+`Play::hash` convention ("the position this play produced") are right. En passant now validates and
+generates moves for double pushes by **both** sides, verified against hand-built positions (White
+J1→J3 with ep field J2; Black B11→B9 with ep field B10, on each of the two capture squares).
 
-**`validate_en_passant` rejects every en passant against a White double push** (defect 16), while
-the Black-pushed mirror now validates. Verified against hand-built positions: White J1→J3 with ep
-field J2 and a Black pawn on I3 comes back `Err(InvalidBoard(..))`; Black B11→B9 with ep field B10
-is `Ok` for a White pawn on either capture square (A10 and C9). Its *structure* is sound — checks
-(1)-(3) exactly characterise a legal double push (skipped field empty, pawn at `field + forward`,
-origin at `field - forward` an empty starting square) — only the White arithmetic is broken.
+Two coverage holes remain, and both need closing regardless of the fix: no test passes `Some(..)` to
+`from_board`, so `validate_en_passant` has no coverage at all; and no test compares `position_hash`
+against a freshly computed `from_board`, so a hash desync survives a green suite. `test_undo`
+catches `undo` only because `Game` derives `Serialize` and `position_hash` is a serialized field.
 
-Two coverage holes let this through, and both need closing regardless of the fixes: no test passes
-`Some(..)` to `from_board`, so `validate_en_passant` has no coverage at all; and no test compares
-`position_hash` against a freshly computed `from_board`, so a hash desync survives a green suite.
-`test_undo` catches `undo` only because `Game` derives `Serialize` and `position_hash` is a
-serialized field.
+## Defect 14 — the stale history read
 
-## Defects
-
-Numbering is stable across revisions; resolved entries have been dropped, so there are gaps.
-
-| # | Where | Problem |
-|---|-------|---------|
-| 11 | `lib.rs:28-33` | `Side::move_direction()` returns `(1, 0)` for White — the wrong axis, and in fact one of White's *capture* directions (`pawn_capture_moves(White) == [(1,0), (-1,1)]`). Pawns advance along **x**: `get_pawn_moves` builds `(0, orientation)` (`board.rs:169-170`) and `get_en_passant_field` moves `origin.x` holding `y` fixed. Black's `(0, -1)` is right; White's should be `(0, 1)`. `get_moved_pawn_position_from_en_passant` therefore looks for the double-stepped white pawn on the wrong square and `Board::get_en_passant_moves` returns `None`. Pre-existing on `main`, not from the refactor. |
-| 13 | `game.rs:265` | Restore the name `move_leaves_king_in_check`. |
-| 14 | `game.rs:413-427` | `get_valid_en_passant_field` reads `self.plays.last()`. Moving the push to the end left `new_en_passant` at `game.rs:417` reading the **previous** move against an already-executed board. **Playing any en passant panics through the public API today.** Detail below. |
-| 16 | `game.rs:174-175, 189` | `let (_, dx) = enemy.move_direction();` with `field.add(0, dx)` works around defect 11 by discarding `dy`. It does not help: for White `move_direction` is `(1, 0)`, so `dx == 0` and `expected_pawn_pos == field` — which check (1) has just proved empty, so check 2a always fails. |
-
-### Defect 14 in detail
+Defect numbering is stable across revisions; 1-13, 15 and 16 are resolved and have been dropped.
 
 `Game::get_en_passant_moves` (`game.rs:288-307`) derives its field from `self.plays.last()`, falling
 back to `en_passant_field_initial`. `make_move` reads it twice: `old_en_passant` (`game.rs:413`,
@@ -50,9 +35,8 @@ before `board.execute`) is fine either way, but `new_en_passant` (`game.rs:417`)
 move *just made* — and with the push at `game.rs:427`, `plays.last()` is still the previous move
 against an already-mutated board. It records a stale ep key, or panics at the `expect`.
 
-**Playing an en passant panics, reachable from the public API with nothing else patched.** Set up a
-position by hand with a legal en passant — Black B11→B9, ep field B10, a White pawn on C9 — and play
-it:
+**Playing any en passant panics through the public API today.** Set up a position by hand with a
+legal en passant — Black B11→B9, ep field B10, a White pawn on C9 — and play it:
 
 ```
 game.make_move(C9, B10)  ->  panicked at 'En passant field not valid ???', game.rs:303
@@ -60,20 +44,16 @@ game.make_move(C9, B10)  ->  panicked at 'En passant field not valid ???', game.
 
 `make_move` executes the capture, then reads `new_en_passant` before the push. With an empty history
 that falls back to `en_passant_field_initial`, still B10, and looks for the pawn behind it — the one
-the capture just removed. `Board::get_en_passant_moves` returns `None` into the `expect`. Use this
-as the regression test: it is a plain sequence of public calls, unlike the `test_en_passant` path
-below, which only reaches line 303 once defect 11 is fixed.
+the capture just removed. Use this as the regression test: a plain sequence of public calls.
+`test_en_passant` reproduces the same panic mid-game.
 
-`test_en_passant` is the second reproduction: Black answers the double push with the en-passant
-capture, `new_en_passant` re-derives White's old field J2, looks for the white pawn behind it — just
-captured — and feeds `None` into the same `expect`. Confirmed by experiment: with defect 11 patched
-it still panics there; additionally restoring the old push order makes it pass and `test_undo` fail
-again. Ordering alone cannot satisfy both — the history read has to go.
+Ordering alone cannot fix it — restoring the old push order makes `test_en_passant` pass and
+`test_undo` fail again. The history read has to go.
 
-## Fix
+### Fix
 
-**Defect 14.** Give `Game::get_en_passant_moves` a sibling that takes the move instead of reading
-history — `Board::get_en_passant_field(&game_move)` already derives the field from a move, and
+Give `Game::get_en_passant_moves` a sibling that takes the move instead of reading history —
+`Board::get_en_passant_field(&game_move)` already derives the field from a move, and
 `Board::get_en_passant_moves` already takes it as an argument:
 
 ```rust
@@ -90,17 +70,16 @@ self.plays.push(Play { game_move, hash: self.position_hash });
 Keeps `Play::hash` as the position produced, without the stale read, and makes the
 `// The GameMove stores the hash after the move` comment true again.
 
-**Defect 11.** `Side::move_direction()` → `(0, 1)` for White. Better still, have `get_pawn_moves`
-use it too (`board.rs:169-170` builds the same value inline), so there is one definition of
-"forward" and the next mismatch cannot happen.
+## Cleanups
 
-**Defect 16.** With 11 fixed, restore both components: `let (dy, dx) = enemy.move_direction();`,
-`field.add(dy, dx)` for the pawn and `field.add(-dy, -dx)` for its origin. The current
-`field.add(0, -1 * dx)` is also a clippy `neg_multiply` — the one warning the lib emits today.
-
-### Cleanups
-
-- `validate_en_passant` check (3) routes through the `expect` at `game.rs:302`, and is safe only
+- **One definition of "forward."** `Side::move_direction()` and `get_pawn_moves` (`board.rs:169-170`)
+  build the same value independently. They drifted apart once already — that was defect 11, where
+  White's direction sat on the wrong axis. Have `get_pawn_moves` call `move_direction()`.
+- `validate_en_passant` discards `dy` (`game.rs:174`, `let (_, dx)` with `field.add(0, dx)`). Correct
+  only because every direction currently has `dy == 0`; silently breaks if that changes. Restore
+  `let (dy, dx)` with `field.add(dy, dx)` and `field.add(-dy, -dx)`, which also clears the `-1 * dx`
+  at `game.rs:189` — the one clippy warning the lib emits.
+- `validate_en_passant` check (3) routes through the `expect` at `game.rs:303`, and is safe only
   because checks (1)/(2) screen out every `None` case first — both paths happen to go through
   `get_moved_pawn_position_from_en_passant`. Invisible coupling, one edit from a panic in a
   constructor; comment it at minimum.
@@ -109,30 +88,26 @@ use it too (`board.rs:169-170` builds the same value inline), so there is one de
   rather than a `pub` field, since it is a derived value with an invariant tying it to the board.
 - `Play` could take `#[non_exhaustive]`: its public fields let outside code build one whose `hash`
   does not match its `game_move`. Harmless until something like `Game::from_plays` appears.
-- `UserError::OutsideBoard` (`game.rs:19`) is never constructed; `GameMove::is_en_passant`
+- `UserError::OutsideBoard` (`game.rs:20`) is never constructed; `GameMove::is_en_passant`
   (`board.rs:87`) has no caller.
 
 ## Verification
 
 - `cargo test -p engine` — all 27 pass; `cargo clippy -p engine --all-targets` — clean.
-- **Positive cases for `validate_en_passant`, both sides** — the gap that let an always-rejecting
-  validator ship. The Black-pushed side passes today and the White-pushed side does not (defect 16),
-  so a one-sided test proves nothing; assert both, on each of the two capture squares.
-- Negative cases, each `Err(UserError::InvalidBoard(..))` and never a panic: a piece on the ep
-  field; no pawn behind it; the pawn's origin not a starting square; the origin occupied; a field no
-  pawn of the side to move can capture on.
+- **Defect 14 regression test**: the hand-set-up repro above — `from_board` with a legal ep field,
+  then `make_move` of the capture. It panics today and needs nothing else fixed first.
 - **Hash invariant test**: play a scripted game covering a double push, an en-passant capture, a
   normal capture and a promotion; after *every* `make_move`, `promote` and `undo` assert
   `position_hash == PositionHash::from_board(&board, active_side, en_passant_field)`. Add the same
   assertion for `Game::new()`, for `from_board(.., Side::Black, ..)`, and for
   `from_board(.., Some(field))` followed by one unrelated move. Nothing checks a freshly constructed
   game today, which is how the old inverted starting hash went unnoticed through a green suite.
-- **Lock in the `get_movement_options` fix**, which has none: in a position with a live en passant,
-  assert `get_movement_options(pos)` returns only moves with `origin == pos` for *every* piece of
-  the side to move, and that `make_move(rook, en_passant_field)` is `Err(IllegalMove)` rather than
-  silently playing the pawn's capture.
-- Defect 11: `test_en_passant` covers a White double push; add the Black mirror.
-- Defect 14: the hand-set-up repro above — `from_board` with a legal ep field, then `make_move` of
-  the capture — panics today and needs nothing else fixed first, so it is the regression test. Add a
-  transposition check too: two move orders reaching the same position hash equal, and move-then-undo
-  returns the exact prior hash.
+- **`validate_en_passant` cases**, since it has none: both sides accepted, on each of the two capture
+  squares; and rejected with `Err(UserError::InvalidBoard(..))` — never a panic — for a piece on the
+  ep field, no pawn behind it, the pawn's origin not a starting square, the origin occupied, and a
+  field no pawn of the side to move can capture on.
+- **`get_movement_options`**, whose fix has no test: in a position with a live en passant, assert it
+  returns only moves with `origin == pos` for *every* piece of the side to move, and that
+  `make_move(rook, en_passant_field)` is `Err(IllegalMove)`.
+- Transposition: two move orders reaching the same position hash equal, and move-then-undo returns
+  the exact prior hash.
