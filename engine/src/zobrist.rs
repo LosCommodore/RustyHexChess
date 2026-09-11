@@ -120,7 +120,7 @@ impl PositionHash {
     /// Hands the turn to the other side. There is one key for this, folded in
     /// while Black is to move and out again when it is White's turn, so this
     /// takes no side: calling it is the change of turn itself.
-    fn update_active_player(&mut self) {
+    pub(crate) fn update_active_player(&mut self) {
         self.hash ^= KEYS[BLACKS_TURN];
     }
 
@@ -142,7 +142,7 @@ impl PositionHash {
         }
     }
 
-    pub(crate) fn update_move(&mut self, game_move: &GameMove, change_player: bool) {
+    pub(crate) fn update_move(&mut self, game_move: &GameMove) {
         match game_move.action {
             Action::Move => {
                 self.update_piece(game_move.origin, &game_move.piece);
@@ -160,10 +160,6 @@ impl PositionHash {
                 self.update_piece(game_move.origin, &game_move.piece);
                 self.update_piece(game_move.destination, to);
             }
-        }
-
-        if change_player {
-            self.update_active_player();
         }
     }
 

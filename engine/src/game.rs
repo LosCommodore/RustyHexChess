@@ -191,7 +191,7 @@ impl Game {
             return Err(err_en_passant(err_msg2));
         }
 
-        if !self.board.pieces.contains_key(&pawn_origin) {
+        if self.board.pieces.contains_key(&pawn_origin) {
             return Err(err_en_passant(err_msg2));
         };
 
@@ -349,16 +349,6 @@ impl Game {
         self.update_state();
     }
 
-    /// Sets who moves first. Only meaningful before any move has been played,
-    /// i.e. when a game starts from a position that was set up by hand.
-    pub fn with_active_side(&mut self, side: Side) {
-        self.active_side = side;
-
-        // The position is only finished for whoever is on turn, so switching sides
-        // can end the game or bring it back to life.
-        self.update_state();
-    }
-
     // Make a move using human coordinates
     pub fn make_human_move(
         &mut self,
@@ -413,7 +403,11 @@ impl Game {
 
         let new_en_passant = self.get_valid_en_passant_field(!self.active_side);
 
-        self.position_hash.update_move(&game_move, !does_promote);
+        self.position_hash.update_move(&game_move);
+        if !does_promote {
+            self.position_hash.update_active_player();
+        }
+
         self.position_hash
             .update_en_passant(old_en_passant, new_en_passant);
 
@@ -486,7 +480,8 @@ impl Game {
             action: Action::Promote { to: new_piece },
         };
 
-        self.position_hash.update_move(&game_move, true);
+        self.position_hash.update_move(&game_move);
+        self.position_hash.update_active_player();
 
         let hash = self.position_hash;
         self.plays.push(Play { game_move, hash });
@@ -823,33 +818,31 @@ mod tests {
             .pieces
             .insert(human(('D', 4)).unwrap(), Piece::new(Queen, White));
 
-        let mut game = Game::from_board(board, Side::White, None).expect("Invalid board ???");
+        // The same position is a live game for White and stalemate for Black, so
+        // who is on turn is what decides whether it is over.
+        let mut white_to_move =
+            Game::from_board(board.clone(), White, None).expect("Invalid board ???");
 
-        // White is on turn by default and still has moves
-        assert_eq!(game.check_king(), KingState::Ok);
-        assert!(matches!(game.state, GameState::Normal));
+        assert_eq!(white_to_move.check_king(), KingState::Ok);
+        assert!(matches!(white_to_move.state, GameState::Normal));
 
         // Black's king is unattacked but every one of its moves runs into the queen
-        game.with_active_side(Black);
+        let mut black_to_move = Game::from_board(board, Black, None).expect("Invalid board ???");
 
-        assert_eq!(game.check_king(), KingState::StaleMate);
+        assert_eq!(black_to_move.check_king(), KingState::StaleMate);
         assert!(
-            matches!(game.state, GameState::GameOver { .. }),
+            matches!(black_to_move.state, GameState::GameOver { .. }),
             "should be game over"
         );
 
-        let result = game.game_result().expect("no game result !");
+        let result = black_to_move.game_result().expect("no game result !");
         assert_eq!(result.winner, None);
         assert!(matches!(result.outcome, OutCome::StaleMate));
 
         assert!(matches!(
-            game.make_human_move(('A', 6), ('A', 7)),
+            black_to_move.make_human_move(('A', 6), ('A', 7)),
             Err(UserError::WrongGameState(_))
         ));
-
-        // Handing the turn back to White revives the game
-        game.with_active_side(White);
-        assert!(matches!(game.state, GameState::Normal));
     }
 
     #[test]

@@ -1,3 +1,13 @@
+//! **Parked — not part of the current engine work.**
+//!
+//! This module is commented out of `lib.rs`, so nothing here is compiled or
+//! type-checked, and it has drifted from the engine's current signatures. Leave
+//! it alone until the engine is finished; it gets one deliberate pass then,
+//! rather than piecemeal fixes now. Do not treat it as a caller when judging
+//! whether an engine change is safe.
+//!
+//! ---
+//!
 //! The engine's outward-facing API: one mutable handle, plain data in and out.
 //!
 //! This layer translates. [`GameApi`] owns a [`Game`], applies commands to it,
@@ -459,14 +469,13 @@ impl GameApi {
         }
 
         let board = Board { pieces: board };
-        let mut game = Game::from_board(board).map_err(|err| {
+        let game = Game::from_board(board, active.into(), None).map_err(|err| {
             // `from_board` is the single authority on which boards are playable,
             // but it reports a missing king as prose. Name the colour, so the
             // caller gets `MissingKing` rather than a generic engine error.
             missing_king(pieces).unwrap_or_else(|| ApiError::from(err))
         })?;
 
-        game.with_active_side(active.into());
         Ok(Self { game })
     }
 
