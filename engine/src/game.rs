@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
+use crate::piece::pawn_starting_positions;
 use crate::{Side, board, zobrist::PositionHash};
 use crate::{
     board::{Action, Board, GameMove, MoveError},
@@ -70,7 +71,7 @@ pub struct GameResult {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct Play {
     pub game_move: GameMove,
-    pub hash: PositionHash,
+    pub hash: PositionHash, // hash of the position this play produced
 }
 
 #[derive(Copy, Default, Debug, Clone, Serialize)]
@@ -141,10 +142,65 @@ impl Game {
             state: GameState::Normal,
         };
 
+        if let Some(field) = en_passant_field {
+            game.validate_en_passant(field)?;
+        };
+
         // A hand-set-up position can already be finished before anyone moved.
         game.update_state();
 
         Ok(game)
+    }
+
+    // Validate a given en passant field:
+    // (1) en passant field must be empty
+    // (2) a correct pawn must exist to have created the en passant
+    // (3) en passant must be playable by active player
+    fn validate_en_passant(&mut self, field: Position) -> Result<()> {
+        let err_en_passant = |x: &str| {
+            let msg = format!("Invalid en passant: {x}");
+            UserError::InvalidBoard(msg)
+        };
+
+        // Check (1) - en passant field must be empty
+        if self.board.pieces.contains_key(&field) {
+            return Err(err_en_passant("figure on field"));
+        };
+
+        // Check (2) - a correct pawn must exist to have created the en passant
+        let err_msg2 = "No pawn that could have created this en passant";
+        let enemy = !self.active_side;
+        let (_, dx) = enemy.move_direction();
+        let expected_pawn_pos = field.add(dy, dx).ok_or(err_en_passant(err_msg2))?;
+
+        // 2a - check pawn at destination
+        let pawn = self
+            .board
+            .pieces
+            .get(&expected_pawn_pos)
+            .ok_or(err_en_passant(err_msg2))?;
+
+        if *pawn != Piece::new(PieceType::Pawn, enemy) {
+            return Err(err_en_passant(err_msg2));
+        }
+
+        // 2b - check origin of pawn
+        let pawn_origin = field.add(0, -1 * dx).ok_or(err_en_passant(err_msg2))?;
+        let starting_positions = pawn_starting_positions(enemy);
+        if !starting_positions.contains(&pawn_origin) {
+            return Err(err_en_passant(err_msg2));
+        }
+
+        if !self.board.pieces.contains_key(&pawn_origin) {
+            return Err(err_en_passant(err_msg2));
+        };
+
+        // (3) - Check en passant must be playable by active player
+        if self.get_en_passant_moves(self.active_side).is_empty() {
+            return Err(err_en_passant("En passant cannot be played"));
+        };
+
+        Ok(())
     }
 
     pub fn board(&self) -> &Board {
@@ -354,16 +410,17 @@ impl Game {
         let old_en_passant = self.get_valid_en_passant_field(self.active_side);
 
         self.board.execute(&game_move);
-        self.plays.push(Play {
-            game_move: game_move.clone(),
-            hash: self.position_hash,
-        });
 
         let new_en_passant = self.get_valid_en_passant_field(!self.active_side);
 
         self.position_hash.update_move(&game_move, !does_promote);
         self.position_hash
             .update_en_passant(old_en_passant, new_en_passant);
+
+        self.plays.push(Play {
+            game_move: game_move.clone(),
+            hash: self.position_hash,
+        });
 
         if does_promote {
             self.state = GameState::Promotion;
