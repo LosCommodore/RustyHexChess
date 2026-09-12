@@ -186,7 +186,7 @@ impl Game {
         }
 
         // 2b - check origin of pawn
-        let pawn_origin = field.add(0, -1 * dx).ok_or(err_en_passant(err_msg2))?;
+        let pawn_origin = field.add(0, -dx).ok_or(err_en_passant(err_msg2))?;
         let starting_positions = pawn_starting_positions(enemy);
         if !starting_positions.contains(&pawn_origin) {
             return Err(err_en_passant(err_msg2));
@@ -197,7 +197,7 @@ impl Game {
         };
 
         // (3) - Check en passant must be playable by active player
-        if self.get_en_passant_moves(self.active_side).is_empty() {
+        if self.get_en_passant_moves(self.active_side, None).is_empty() {
             return Err(err_en_passant("En passant cannot be played"));
         };
 
@@ -285,12 +285,13 @@ impl Game {
     }
 
     // Get en_passant_moves and filter out pinned pieces
-    fn get_en_passant_moves(&mut self, active_player: Side) -> Vec<GameMove> {
-        let en_passant_field = match self.plays.last() {
-            Some(Play {
-                game_move: last_move,
-                ..
-            }) => self.board.get_en_passant_field(last_move),
+    fn get_en_passant_moves(
+        &mut self,
+        active_player: Side,
+        last_move: Option<GameMove>,
+    ) -> Vec<GameMove> {
+        let en_passant_field = match last_move {
+            Some(move_) => self.board.get_en_passant_field(&move_),
             None => self.en_passant_field_initial,
         };
 
@@ -318,7 +319,11 @@ impl Game {
                 ..
             })
         ) {
-            let en = self.get_en_passant_moves(self.active_side);
+            let en = self.get_en_passant_moves(
+                self.active_side,
+                self.plays().last().map(|x| x.game_move.clone()),
+            );
+
             if let Some(move_) = en.iter().find(|x| x.origin == pos) {
                 mv.push(move_.clone());
             }
@@ -398,8 +403,16 @@ impl Game {
     }
 
     // Returns the validated en passant field (not pinned)
-    fn get_valid_en_passant_field(&mut self, side: Side) -> Option<Position> {
-        Some(self.get_en_passant_moves(side).first()?.destination)
+    fn get_valid_en_passant_field(
+        &mut self,
+        active_player: Side,
+        last_move: Option<GameMove>,
+    ) -> Option<Position> {
+        Some(
+            self.get_en_passant_moves(active_player, last_move)
+                .first()?
+                .destination,
+        )
     }
 
     /// Make a move on the board. Move must be valid, otherwise an error will be returned
@@ -410,11 +423,13 @@ impl Game {
         let game_move = self.validate_move(origin, destination)?;
         let does_promote = game_move.does_promote();
 
-        let old_en_passant = self.get_valid_en_passant_field(self.active_side);
+        let last_move = self.plays().last().map(|x| x.game_move.clone());
+        let old_en_passant = self.get_valid_en_passant_field(self.active_side, last_move);
 
         self.board.execute(&game_move);
 
-        let new_en_passant = self.get_valid_en_passant_field(!self.active_side);
+        let new_en_passant =
+            self.get_valid_en_passant_field(!self.active_side, Some(game_move.clone()));
 
         self.position_hash.update_move(&game_move);
         if !does_promote {
