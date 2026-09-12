@@ -165,12 +165,10 @@ impl Board {
     // The pawn is a special case and therefore has its own function
     fn get_pawn_moves(&self, me: &Piece, pos: Position) -> Vec<GameMove> {
         let mut options = Vec::new();
-        let color = me.side;
-        let orientation = if color == Side::White { 1 } else { -1 };
-        let direction = (0, orientation);
+        let direction = Side::move_direction(&me.side);
 
         // --- walk two steps from starting position
-        let starting_positions = pawn_starting_positions(color);
+        let starting_positions = pawn_starting_positions(me.side);
 
         if starting_positions.contains(&pos) {
             options.extend(self.get_walk_moves(me, pos, direction, Some(2), Capability::Move));
@@ -180,7 +178,7 @@ impl Board {
         }
 
         // --- capture diagonally
-        let capture_moves = pawn_capture_moves(color);
+        let capture_moves = pawn_capture_moves(me.side);
 
         for (dy, dx) in capture_moves {
             let option = self.is_movement_option(pos, me, *dy, *dx, Capability::Capture);

@@ -16,9 +16,6 @@ pub enum UserError {
     #[error(transparent)]
     MoveError(#[from] board::MoveError),
 
-    #[error("This position is outside the board: x={x}, y={y}")]
-    OutsideBoard { y: usize, x: usize },
-
     #[error("This notation is invalid: {0:?}")]
     InvalidHumanNotation(HumanNotation),
 
@@ -69,6 +66,7 @@ pub struct GameResult {
     pub outcome: OutCome,
 }
 
+#[non_exhaustive]
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct Play {
     pub game_move: GameMove,
@@ -553,7 +551,9 @@ mod tests {
     fn board_with(pieces: &[(HumanNotation, PieceType, Side)]) -> Board {
         let mut board = Board::default();
         for &(square, piece_type, side) in pieces {
-            board.pieces.insert(pos(square), Piece::new(piece_type, side));
+            board
+                .pieces
+                .insert(pos(square), Piece::new(piece_type, side));
         }
         board
     }
@@ -1000,7 +1000,11 @@ mod tests {
         for ((origin, destination), en_passant) in script {
             game.make_move(pos(origin), pos(destination))
                 .unwrap_or_else(|err| panic!("{origin:?} -> {destination:?} rejected: {err}"));
-            assert_hash(&game, en_passant.map(pos), &format!("after {origin:?} -> {destination:?}"));
+            assert_hash(
+                &game,
+                en_passant.map(pos),
+                &format!("after {origin:?} -> {destination:?}"),
+            );
         }
 
         game.promote(Queen).expect("promotion");
@@ -1039,9 +1043,14 @@ mod tests {
             (('C', 9), Pawn, White),
         ]);
         let mut game = Game::from_board(board, White, Some(pos(('B', 10)))).expect("valid board");
-        assert_hash(&game, Some(pos(('B', 10))), "for a board set up with an en passant");
+        assert_hash(
+            &game,
+            Some(pos(('B', 10))),
+            "for a board set up with an en passant",
+        );
 
-        game.make_move(pos(('A', 11)), pos(('A', 10))).expect("king move");
+        game.make_move(pos(('A', 11)), pos(('A', 10)))
+            .expect("king move");
         assert_hash(&game, None, "after the en passant lapsed");
     }
 
@@ -1119,7 +1128,10 @@ mod tests {
         ) {
             match Game::from_board(board_with(pieces), Side::White, Some(pos(en_passant))) {
                 Err(UserError::InvalidBoard(_)) => {}
-                other => panic!("{why}: expected InvalidBoard, got {:?}", other.map(|_| "Ok")),
+                other => panic!(
+                    "{why}: expected InvalidBoard, got {:?}",
+                    other.map(|_| "Ok")
+                ),
             }
         }
 
@@ -1156,7 +1168,11 @@ mod tests {
 
         let mut nobody_can_take = kings.to_vec();
         nobody_can_take.push((('B', 9), Pawn, Black));
-        assert_rejected(&nobody_can_take, ('B', 10), "no pawn of White's can capture there");
+        assert_rejected(
+            &nobody_can_take,
+            ('B', 10),
+            "no pawn of White's can capture there",
+        );
     }
 
     // An en-passant capture belongs to the pawn that can make it, not to every
@@ -1244,10 +1260,14 @@ mod tests {
 
         let mut game = kings_first;
         let before = game.position_hash;
-        game.make_move(pos(('G', 2)), pos(('G', 3))).expect("rook move");
+        game.make_move(pos(('G', 2)), pos(('G', 3)))
+            .expect("rook move");
         assert_ne!(game.position_hash, before, "a move must change the hash");
 
         game.undo().expect("undo");
-        assert_eq!(game.position_hash, before, "undo must restore the exact hash");
+        assert_eq!(
+            game.position_hash, before,
+            "undo must restore the exact hash"
+        );
     }
 }
