@@ -47,6 +47,8 @@
         </div>
       </q-page>
     </q-page-container>
+
+    <PromotionDialog />
   </q-layout>
 </template>
 
@@ -57,6 +59,7 @@ import GameControls from '@/components/GameControls.vue';
 import GameInfo from '@/components/GameInfo.vue';
 import MoveHistory from '@/components/MoveHistory.vue';
 import PiecePalette from '@/components/PiecePalette.vue';
+import PromotionDialog from '@/components/PromotionDialog.vue';
 
 const drawer = ref(true);
 const tab = ref('history');

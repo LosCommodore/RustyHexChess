@@ -78,16 +78,18 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import {
   applyTool,
   game,
   isBrowsing,
+  markersFor,
   movePiece,
   PIECE_SYMBOLS,
   placementTool,
   viewedPieces,
   type HexCoord,
+  type Marker,
 } from '@/game/state';
 
 const HEX_RADIUS = 40;
@@ -108,23 +110,22 @@ for (let q = -BOARD_RADIUS; q <= BOARD_RADIUS; q++) {
 
 const selectedHex = ref<HexCoord | null>(null);
 
-/** A hex highlighted as a move option: a dot for a step, a ring for a capture. */
-type MarkerKind = 'move' | 'capture';
-interface Marker extends HexCoord {
-  kind: MarkerKind;
-}
+// The engine's legal moves for the selected piece. `markersFor` calls the
+// engine, so the computed reads the reactive position too, to refresh after a
+// move or an undo.
+const activeMarkers = computed<Marker[]>(() => {
+  void game.history.length;
+  void game.pieces;
+  return markersFor(selectedHex.value);
+});
 
-// Placeholder until the engine supplies real move generation — these are just
-// a few hexes around the centre so the layer is visible.
-const markers = ref<Marker[]>([
-  { q: 0, r: -1, kind: 'move' },
-  { q: 1, r: -1, kind: 'move' },
-  { q: 0, r: 1, kind: 'move' },
-  { q: -1, r: 0, kind: 'capture' },
-]);
-
-// Move options are meaningless while placing pieces freely.
-const activeMarkers = computed(() => (game.mode === 'game' ? markers.value : []));
+// A played move (or undo) invalidates the selection's move options.
+watch(
+  () => game.history.length,
+  () => {
+    selectedHex.value = null;
+  },
+);
 
 // Set of "q,r" keys so the per-hex lookup below stays O(1) across 91 hexes.
 const markedHexes = computed(() => new Set(activeMarkers.value.map(m => `${m.q},${m.r}`)));
@@ -187,11 +188,29 @@ function getHexClass(hex: HexCoord): string {
   return colors[(((hex.q + 2 * hex.r) % 3) + 3) % 3]!;
 }
 
-/** With a setup tool active a click edits the board; otherwise it selects. */
+/**
+ * With a setup tool active a click edits the board. Otherwise it selects a
+ * piece, or — when one is already selected — plays a move to the clicked hex.
+ * The engine validates, so an illegal target is simply a no-op.
+ */
 function onHexClick(hex: HexCoord) {
   if (placementTool.value) {
     applyTool(hex);
     return;
+  }
+  if (isBrowsing.value) return;
+
+  const selected = selectedHex.value;
+  if (selected) {
+    const fromIndex = game.pieces.findIndex(p => p.q === selected.q && p.r === selected.r);
+    const ownPieceHere = game.pieces.some(
+      p => p.q === hex.q && p.r === hex.r && p.color === game.activePlayer,
+    );
+    if (fromIndex >= 0 && !ownPieceHere) {
+      movePiece(fromIndex, hex);
+      selectedHex.value = null;
+      return;
+    }
   }
   selectHex(hex);
 }
@@ -208,6 +227,8 @@ function startDrag(event: MouseEvent, index: number) {
 
   const piece = game.pieces[index];
   if (!piece) return;
+  // Grabbing a piece selects it, so its move options show while dragging.
+  selectedHex.value = { q: piece.q, r: piece.r };
   const pixel = hexToPixel(piece.q, piece.r);
   drag.value = {
     index,

@@ -12,6 +12,7 @@ export default defineConfig((/* ctx */) => {
     // --> boot files are part of "main.js"
     // https://v2.quasar.dev/quasar-cli-vite/boot-files
     boot: [
+      'engine'
     ],
 
     // https://v2.quasar.dev/quasar-cli-vite/quasar-config-file#css
@@ -59,7 +60,14 @@ export default defineConfig((/* ctx */) => {
       // minify: false,
       // distDir
 
-      // extendViteConf (viteConf) {},
+      // The WASM engine lives at ../engine/pkg, outside the frontend root, so
+      // Vite must be allowed to read and serve it (dev) and bundle it (build).
+      extendViteConf(viteConf) {
+        viteConf.server ??= {};
+        viteConf.server.fs ??= {};
+        viteConf.server.fs.allow ??= [];
+        viteConf.server.fs.allow.push('..');
+      },
       // viteVuePluginOptions: {},
 
       // to write components with JSX/TSX:
@@ -93,7 +101,9 @@ export default defineConfig((/* ctx */) => {
       // directives: [],
 
       // Quasar plugins
-      plugins: []
+      plugins: [
+        'Notify'
+      ]
     },
 
     // animations: 'all', // --- includes all animations

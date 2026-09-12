@@ -2,7 +2,7 @@ use serde::Serialize;
 use std::ops::Not;
 use strum::{EnumCount, EnumIter};
 
-// pub mod api; // todo: uncomment later and adjust api to the code changes
+pub mod api;
 pub mod board;
 pub mod coordinates;
 /// Terminal and HTML rendering. Not available on wasm: it draws with crossterm.

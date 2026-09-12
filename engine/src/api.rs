@@ -1,13 +1,3 @@
-//! **Parked — not part of the current engine work.**
-//!
-//! This module is commented out of `lib.rs`, so nothing here is compiled or
-//! type-checked, and it has drifted from the engine's current signatures. Leave
-//! it alone until the engine is finished; it gets one deliberate pass then,
-//! rather than piecemeal fixes now. Do not treat it as a caller when judging
-//! whether an engine change is safe.
-//!
-//! ---
-//!
 //! The engine's outward-facing API: one mutable handle, plain data in and out.
 //!
 //! This layer translates. [`GameApi`] owns a [`Game`], applies commands to it,
@@ -24,9 +14,10 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 use crate::{
-    Game, GameState as EngineState, Side, UserError,
+    Side,
     board::{Action, Board, GameMove, MoveError},
-    coordinates::{CoordinateError, Position},
+    coordinates::Position,
+    game::{Game, GameState as EngineState, UserError},
     piece::{Piece, PieceType},
 };
 
@@ -280,7 +271,6 @@ impl From<UserError> for ApiError {
             UserError::MoveError(MoveError::NoPieceAtPosition(pos)) => Self::NoPieceAtSquare {
                 square: square_name(pos),
             },
-            UserError::CoordinateError(e) => Self::from(e),
             // Unreachable through [`GameApi`], which checks the phase before it
             // calls the engine — but it must not degrade to `code: "engine"`.
             UserError::WrongGameState(state) => Self::WrongPhase {
@@ -294,19 +284,6 @@ impl From<UserError> for ApiError {
     }
 }
 
-impl From<CoordinateError> for ApiError {
-    fn from(error: CoordinateError) -> Self {
-        match error {
-            CoordinateError::OutsideBoard { y, x } => Self::InvalidSquare {
-                square: format!("{y},{x}"),
-            },
-            CoordinateError::InvalidHumanNotation { y, x } => Self::InvalidSquare {
-                square: format!("{y}{x}"),
-            },
-        }
-    }
-}
-
 pub type Result<T> = std::result::Result<T, ApiError>;
 
 // --- Squares ------------------------------------------------------------
@@ -315,7 +292,7 @@ pub type Result<T> = std::result::Result<T, ApiError>;
 ///
 /// The board is a hexagon, so files have different lengths and a name can be
 /// well-formed yet off the board — `a1` is not a square. `Position::from_human`
-/// does not catch that, so the result is re-checked through `Position::new`.
+/// bounds-checks through `Position::new`, so an off-board name yields `None`.
 pub fn parse_square(square: &str) -> Result<Position> {
     let invalid = || ApiError::InvalidSquare {
         square: square.to_string(),
@@ -325,9 +302,7 @@ pub fn parse_square(square: &str) -> Result<Position> {
     let file = chars.next().ok_or_else(invalid)?;
     let rank: usize = chars.as_str().parse().map_err(|_| invalid())?;
 
-    let pos = Position::from_human((file, rank)).map_err(|_| invalid())?;
-    let (y, x) = pos.pos();
-    Position::new(y, x).map_err(|_| invalid())
+    Position::from_human((file, rank)).ok_or_else(invalid)
 }
 
 /// The inverse of [`parse_square`], always lowercase: `"f5"`.
@@ -609,12 +584,16 @@ fn snapshot(game: &mut Game) -> GameState {
         })
         .collect();
 
-    let history: Vec<PlayedMove> = game.moves().iter().map(played_move).collect();
+    let history: Vec<PlayedMove> = game
+        .plays()
+        .iter()
+        .map(|play| played_move(&play.game_move))
+        .collect();
 
     let mut captured = Captured::default();
-    for mv in game.moves() {
-        if let Action::Capture { enemy, .. } = &mv.action {
-            match mv.piece.side {
+    for play in game.plays() {
+        if let Action::Capture { enemy, .. } = &play.game_move.action {
+            match play.game_move.piece.side {
                 Side::White => captured.white.push(enemy.piece_type.into()),
                 Side::Black => captured.black.push(enemy.piece_type.into()),
             }
@@ -624,17 +603,19 @@ fn snapshot(game: &mut Game) -> GameState {
     // A promotion is recorded as an extra move on top of the pawn move that
     // caused it, so it must not count towards the move number.
     let half_moves = game
-        .moves()
+        .plays()
         .iter()
-        .filter(|mv| !matches!(mv.action, Action::Promote { .. }))
+        .filter(|play| !matches!(play.game_move.action, Action::Promote { .. }))
         .count();
 
     let active = game.active_side();
     let check = game.king_in_check(active);
 
-    // `winner` errors while the game is still running, which is exactly the
-    // `None` this field wants.
-    let winner = game.winner().unwrap_or(None).map(Color::from);
+    // Set only once the game is over; `None` while it is still running.
+    let winner = game
+        .game_result()
+        .and_then(|result| result.winner)
+        .map(Color::from);
 
     GameState {
         phase: game.state().into(),
@@ -645,7 +626,7 @@ fn snapshot(game: &mut Game) -> GameState {
         pieces,
         captured,
         history,
-        can_undo: !game.moves().is_empty(),
+        can_undo: !game.plays().is_empty(),
     }
 }
 
