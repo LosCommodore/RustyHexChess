@@ -525,33 +525,38 @@ impl Game {
         Ok(())
     }
 
+    // A position seen three times is a draw. Hashes stand in for positions, so
+    // this assumes no Zobrist collision (as every hash-based repetition check does).
     fn check_three_fold_repetition(&self) -> bool {
-        let mut count = 0;
+        // The current position (`self.position_hash`, == `plays.last()`) is the
+        // first occurrence; skip(1) walks the history before it.
+        let mut count = 1;
         for Play {
             game_move: GameMove { piece, action, .. },
             hash,
         } in self.plays.iter().rev().skip(1)
         {
-            // Any action with a pawn is irreversible
-            if piece.piece_type == PieceType::Pawn {
-                return false;
-            }
-
-            // Capture or Promote is irreversible
-            if matches!(action, Action::Capture { .. } | Action::Promote { .. }) {
-                return false;
-            }
-
             if *hash == self.position_hash {
                 count += 1;
+                if count == 3 {
+                    return true;
+                }
             }
 
-            if count == 2 {
-                return true;
+            // An irreversible move (pawn move, capture, promotion): the position
+            // it produced was just counted, but nothing before it can match the
+            // current one, so the scan stops here.
+            if piece.piece_type == PieceType::Pawn
+                || matches!(action, Action::Capture { .. } | Action::Promote { .. })
+            {
+                return false;
             }
         }
 
-        false
+        // No irreversible move separated us from the start, so the initial
+        // position is the remaining candidate occurrence.
+        count += (self.position_hash == self.position_hash_initial) as u32;
+        count >= 3
     }
 }
 
@@ -1318,23 +1323,29 @@ mod tests {
         )
     }
 
-    // Two kings shuffling back and forth: the same position on its third
-    // occurrence must end the game as a draw.
+    // A rook and a king shuffling: the same position on its third occurrence
+    // must end the game as a draw. The rook's opening step is never undone, so
+    // the starting position does not recur and P is the sole repeated position.
     #[test]
     fn threefold_repetition_ends_the_game() {
         use PieceType::*;
         use Side::*;
 
-        let board = board_with(&[(('A', 11), King, White), (('K', 6), King, Black)]);
+        let board = board_with(&[
+            (('A', 11), King, White),
+            (('K', 6), King, Black),
+            (('C', 11), Rook, White),
+        ]);
         let mut game = Game::from_board(board, White, None).expect("valid board");
 
-        // Reach a non-starting position P (1st occurrence), then return to it twice.
-        game.make_move(pos(('A', 11)), pos(('A', 10))).unwrap();
+        // Step the rook off its start to reach P (1st occurrence), then return to
+        // P twice by shuffling the rook and the black king.
+        game.make_move(pos(('C', 11)), pos(('C', 10))).unwrap();
         let cycle = [
             (('K', 6), ('K', 5)),
-            (('A', 10), ('A', 11)),
+            (('C', 10), ('C', 9)),
             (('K', 5), ('K', 6)),
-            (('A', 11), ('A', 10)),
+            (('C', 9), ('C', 10)),
         ];
         for _ in 0..2 {
             for &(origin, destination) in &cycle {
@@ -1351,10 +1362,6 @@ mod tests {
 
     // The starting position is a valid occurrence for the threefold rule, so
     // returning to it twice is its third appearance and must draw.
-    // KNOWN BUG: the initial position lives in `position_hash_initial`, never in
-    // `plays`, so `check_three_fold_repetition` never counts it and detects one
-    // repetition late.
-    #[ignore = "check_three_fold_repetition ignores the initial position"]
     #[test]
     fn threefold_repetition_counts_the_starting_position() {
         use PieceType::*;
@@ -1385,10 +1392,6 @@ mod tests {
 
     // The position right after a capture is a valid occurrence: the scan back
     // must count it before it stops at the (irreversible) capture.
-    // KNOWN BUG: the loop returns `false` on the irreversible move *before*
-    // testing that move's resulting hash, dropping the boundary occurrence and
-    // detecting one repetition late.
-    #[ignore = "check_three_fold_repetition drops the post-capture boundary occurrence"]
     #[test]
     fn threefold_repetition_counts_the_position_after_a_capture() {
         use PieceType::*;
