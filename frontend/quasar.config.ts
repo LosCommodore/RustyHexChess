@@ -3,7 +3,7 @@
 
 import { defineConfig } from '#q-app';
 
-export default defineConfig((/* ctx */) => {
+export default defineConfig((ctx) => {
   return {
     // https://v2.quasar.dev/quasar-cli-vite/prefetch-feature
     // preFetch: true,
@@ -53,7 +53,11 @@ export default defineConfig((/* ctx */) => {
       vueRouterMode: 'hash', // available values: 'hash', 'history'
       // vueRouterBase,
 
-      // publicPath: '/',
+      // GitHub Pages serves a project site under /<repo>/, so production assets
+      // need that prefix. Overridable for a fork or custom domain via PUBLIC_PATH
+      // (set it to '/' for a user/org page or a custom domain at the root).
+      // Dev stays at '/'. Hash router mode means no server-side rewrites.
+      publicPath: ctx.prod ? (process.env.PUBLIC_PATH ?? '/RustyHexChess/') : '/',
       // define: {},
       // defineEnv: {}
       // ignorePublicFolder: true,
