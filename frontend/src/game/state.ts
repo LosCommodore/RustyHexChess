@@ -230,11 +230,18 @@ export function viewLive() {
 export function markersFor(hex: HexCoord | null): Marker[] {
   if (!hex || game.mode !== 'game' || isBrowsing.value) return [];
 
-  return engineLegalMoves(hexName(hex)).map((move) => {
-    if (move.action.type === 'capture') {
-      return { ...fromName(move.action.square), kind: 'capture' as const };
+  return engineLegalMoves(hexName(hex)).flatMap((move) => {
+    if (move.action.type !== 'capture') {
+      return [{ ...fromName(move.to), kind: 'move' as const }];
     }
-    return { ...fromName(move.to), kind: 'move' as const };
+
+    // Ring the square the taken piece stands on. For a normal capture that is
+    // the destination, so one ring is enough. For en passant the taken pawn is
+    // elsewhere, so also dot the (empty) square the pawn actually moves to —
+    // otherwise the destination shows no marker at all.
+    const captured: Marker = { ...fromName(move.action.square), kind: 'capture' };
+    if (move.action.square === move.to) return [captured];
+    return [captured, { ...fromName(move.to), kind: 'move' as const }];
   });
 }
 
