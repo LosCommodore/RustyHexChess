@@ -54,13 +54,19 @@ export interface Marker extends HexCoord {
   kind: 'move' | 'capture';
 }
 
+// U+FE0E, the text-presentation variation selector. Without it iOS/Safari
+// renders these chess symbols as colour emoji, which ignore the CSS `fill`
+// (so "white" pieces come out dark) and size themselves differently (too big).
+// Appending it forces the monochrome text glyph everywhere the symbols appear.
+const TEXT_GLYPH = '︎';
+
 export const PIECE_SYMBOLS: Record<PieceType, string> = {
-  pawn: '♟',
-  rook: '♜',
-  knight: '♞',
-  bishop: '♝',
-  queen: '♛',
-  king: '♚',
+  pawn: `♟${TEXT_GLYPH}`,
+  rook: `♜${TEXT_GLYPH}`,
+  knight: `♞${TEXT_GLYPH}`,
+  bishop: `♝${TEXT_GLYPH}`,
+  queen: `♛${TEXT_GLYPH}`,
+  king: `♚${TEXT_GLYPH}`,
 };
 
 export const STATUS_LABELS: Record<GameStatus, string> = {
