@@ -61,7 +61,9 @@ import MoveHistory from '@/components/MoveHistory.vue';
 import PiecePalette from '@/components/PiecePalette.vue';
 import PromotionDialog from '@/components/PromotionDialog.vue';
 
-const drawer = ref(true);
+// Closed by default; `show-if-above` on the drawer keeps it docked open on wide
+// screens, so this only affects phones/tablets, where it starts out of the way.
+const drawer = ref(false);
 const tab = ref('history');
 </script>
 
@@ -71,8 +73,8 @@ const tab = ref('history');
   background: #f5f5f5;
 }
 
-/* Panels sit beside the board, and drop below it when the viewport is
-   narrower than the board's fixed 800px width. */
+/* Panels sit beside the board on wide screens and wrap below it when the row no
+   longer fits, so the board and controls stack on tablets and phones. */
 .game-body {
   display: flex;
   flex-wrap: wrap;
@@ -80,10 +82,29 @@ const tab = ref('history');
   gap: 24px;
 }
 
+/* Beside the board it stays a tidy fixed width; once wrapped below, it grows to
+   the full row rather than leaving a 220px column stranded on the left. */
 .side-column {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  width: 220px;
+  flex: 1 1 220px;
+  min-width: 200px;
+  max-width: 360px;
+}
+
+/* Tighten the margins on phones so the board gets the width it needs. */
+@media (max-width: 600px) {
+  .game-page {
+    padding: 12px;
+  }
+
+  .game-body {
+    gap: 16px;
+  }
+
+  .side-column {
+    max-width: none;
+  }
 }
 </style>

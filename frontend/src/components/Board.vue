@@ -1,6 +1,11 @@
 <template>
   <div class="board-container">
-    <svg :width="SVG_WIDTH" :height="SVG_HEIGHT" class="board-svg" :viewBox="`0 0 ${SVG_WIDTH} ${SVG_HEIGHT}`">
+    <svg
+      ref="svgEl"
+      class="board-svg"
+      :viewBox="`0 0 ${SVG_WIDTH} ${SVG_HEIGHT}`"
+      preserveAspectRatio="xMidYMid meet"
+    >
       <!-- Hexagons -->
       <g class="hexagons">
         <polygon
@@ -21,7 +26,7 @@
           :y="piece.y"
           class="piece"
           :class="[piece.color, { dragging: piece.dragging, browsing: isBrowsing }]"
-          @mousedown="startDrag($event, piece.index)"
+          @pointerdown="startDrag($event, piece.index)"
           @click.stop="onHexClick(piece)"
         >
           {{ PIECE_SYMBOLS[piece.type] }}
@@ -108,7 +113,12 @@ for (let q = -BOARD_RADIUS; q <= BOARD_RADIUS; q++) {
   }
 }
 
+const svgEl = ref<SVGSVGElement | null>(null);
 const selectedHex = ref<HexCoord | null>(null);
+
+// A drag that actually moved should not also fire the click that would
+// re-select the piece; this swallows that one trailing click.
+let suppressNextClick = false;
 
 // The engine's legal moves for the selected piece. `markersFor` calls the
 // engine, so the computed reads the reactive position too, to refresh after a
@@ -145,8 +155,36 @@ const renderedMarkers = computed(() =>
   }))
 );
 
-/** Live drag, if any. Holds the pixel position the piece is rendered at. */
-const drag = ref<{ index: number; x: number; y: number; grabX: number; grabY: number } | null>(null);
+/**
+ * Live drag, if any. Positions are in SVG coordinates; `grab` is the offset
+ * from the piece centre to the pointer, and `startX/startY` (client pixels) let
+ * us tell a real drag from a tap.
+ */
+const drag = ref<{
+  index: number;
+  x: number;
+  y: number;
+  grabX: number;
+  grabY: number;
+  startX: number;
+  startY: number;
+  moved: boolean;
+} | null>(null);
+
+/**
+ * Maps a client (screen) point into the SVG's own coordinate space, correcting
+ * for however the board is currently scaled and positioned. Everything drag
+ * touches lives in SVG coordinates, so this is the one place client pixels enter.
+ */
+function clientToSvg(clientX: number, clientY: number): { x: number; y: number } {
+  const el = svgEl.value;
+  if (!el) return { x: 0, y: 0 };
+  const rect = el.getBoundingClientRect();
+  return {
+    x: ((clientX - rect.left) / rect.width) * SVG_WIDTH,
+    y: ((clientY - rect.top) / rect.height) * SVG_HEIGHT,
+  };
+}
 
 // A piece sits at its hex centre, except while dragged: then the cursor wins.
 // Pixel position is derived, never stored, so the two can never disagree.
@@ -194,6 +232,11 @@ function getHexClass(hex: HexCoord): string {
  * The engine validates, so an illegal target is simply a no-op.
  */
 function onHexClick(hex: HexCoord) {
+  // A drag just resolved this press into a move; don't also treat it as a click.
+  if (suppressNextClick) {
+    suppressNextClick = false;
+    return;
+  }
   if (placementTool.value) {
     applyTool(hex);
     return;
@@ -220,44 +263,63 @@ function selectHex(hex: HexCoord) {
   selectedHex.value = isSelected ? null : { q: hex.q, r: hex.r };
 }
 
-function startDrag(event: MouseEvent, index: number) {
-  // Past positions are for reading, not editing; and a setup tool means the
-  // click is meant to place or erase, not drag.
-  if (isBrowsing.value || placementTool.value) return;
+const DRAG_THRESHOLD = 5; // client px before a press counts as a drag, not a tap
+
+function startDrag(event: PointerEvent, index: number) {
+  // Only the primary button / a single touch drags; and past positions are for
+  // reading, while a setup tool means the press is meant to place or erase.
+  if (event.button !== 0 || isBrowsing.value || placementTool.value) return;
 
   const piece = game.pieces[index];
   if (!piece) return;
   // Grabbing a piece selects it, so its move options show while dragging.
   selectedHex.value = { q: piece.q, r: piece.r };
-  const pixel = hexToPixel(piece.q, piece.r);
+
+  const pointer = clientToSvg(event.clientX, event.clientY);
+  const centre = hexToPixel(piece.q, piece.r);
   drag.value = {
     index,
-    x: pixel.x,
-    y: pixel.y,
-    grabX: event.clientX - pixel.x,
-    grabY: event.clientY - pixel.y,
+    x: centre.x,
+    y: centre.y,
+    grabX: pointer.x - centre.x,
+    grabY: pointer.y - centre.y,
+    startX: event.clientX,
+    startY: event.clientY,
+    moved: false,
   };
-  document.addEventListener('mousemove', handleDrag);
-  document.addEventListener('mouseup', endDrag);
+  window.addEventListener('pointermove', handleDrag);
+  window.addEventListener('pointerup', endDrag);
+  window.addEventListener('pointercancel', endDrag);
 }
 
-function handleDrag(event: MouseEvent) {
-  if (!drag.value) return;
-  drag.value.x = event.clientX - drag.value.grabX;
-  drag.value.y = event.clientY - drag.value.grabY;
+function handleDrag(event: PointerEvent) {
+  const current = drag.value;
+  if (!current) return;
+  event.preventDefault(); // keep touch drags from scrolling the page
+
+  if (Math.hypot(event.clientX - current.startX, event.clientY - current.startY) > DRAG_THRESHOLD) {
+    current.moved = true;
+  }
+  const pointer = clientToSvg(event.clientX, event.clientY);
+  current.x = pointer.x - current.grabX;
+  current.y = pointer.y - current.grabY;
 }
 
 function endDrag() {
   const current = drag.value;
+  drag.value = null;
+  window.removeEventListener('pointermove', handleDrag);
+  window.removeEventListener('pointerup', endDrag);
+  window.removeEventListener('pointercancel', endDrag);
   if (!current) return;
 
-  const dropped = pixelToHex(current.x, current.y);
-  const target = hexagons.find(h => h.q === dropped.q && h.r === dropped.r);
-  if (target) movePiece(current.index, target);
-
-  drag.value = null;
-  document.removeEventListener('mousemove', handleDrag);
-  document.removeEventListener('mouseup', endDrag);
+  // A press that never moved is a tap: leave it to the click handler to select.
+  if (current.moved) {
+    suppressNextClick = true;
+    const dropped = pixelToHex(current.x, current.y);
+    const target = hexagons.find(h => h.q === dropped.q && h.r === dropped.r);
+    if (target) movePiece(current.index, target);
+  }
 }
 
 // --- Coordinate labels -------------------------------------------------
@@ -324,14 +386,23 @@ const rankLabels = computed(() =>
 
 <style scoped>
 /* No padding or background: the page owns both, so the board's top edge
-   lines up with whatever sits beside it. */
+   lines up with whatever sits beside it. min-width:0 lets the board shrink
+   inside a flex row instead of forcing the page to scroll sideways. */
 .board-container {
   display: flex;
   justify-content: center;
   align-items: flex-start;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
+/* The viewBox fixes the aspect ratio, so the board scales to its container:
+   full width on a phone, capped so it never dwarfs the panels on a desktop. */
 .board-svg {
+  display: block;
+  width: 100%;
+  max-width: 800px;
+  height: auto;
   filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.15));
   background: white;
 }
@@ -395,6 +466,8 @@ const rankLabels = computed(() =>
   dominant-baseline: middle;
   cursor: grab;
   user-select: none;
+  /* A touch that starts on a piece is a drag, not a page scroll. */
+  touch-action: none;
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
 }
 
