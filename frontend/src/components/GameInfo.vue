@@ -10,7 +10,7 @@
 
     <section class="panel">
       <h2 class="panel-title">Game state</h2>
-      <span class="status" :class="game.status">{{ STATUS_LABELS[game.status] }}</span>
+      <span class="status" :class="game.status">{{ game.statusLabel }}</span>
     </section>
 
     <section class="panel">
@@ -38,7 +38,6 @@ import { computed } from 'vue';
 import {
   game,
   PIECE_SYMBOLS,
-  STATUS_LABELS,
   type PlayerColor,
 } from '@/game/state';
 

@@ -17,7 +17,7 @@ use crate::{
     Side,
     board::{Action, Board, GameMove, MoveError},
     coordinates::Position,
-    game::{Game, GameState as EngineState, UserError},
+    game::{Game, GameState as EngineState, OutCome, UserError},
     piece::{Piece, PieceType},
 };
 
@@ -74,6 +74,35 @@ impl From<EngineState> for Phase {
             EngineState::Normal => Phase::Normal,
             EngineState::Promotion => Phase::Promotion,
             EngineState::GameOver { .. } => Phase::Finished,
+        }
+    }
+}
+
+/// Why a finished game ended, so the UI can name the result rather than showing
+/// a bare "draw" for every drawn ending. Set only when `phase` is `Finished`.
+#[cfg_attr(target_family = "wasm", derive(tsify::Tsify))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Outcome {
+    Checkmate,
+    Stalemate,
+    ThreefoldRepetition,
+    FiftyMoves,
+    InsufficientMaterial,
+    Agreement,
+    Resignation,
+}
+
+impl From<OutCome> for Outcome {
+    fn from(outcome: OutCome) -> Self {
+        match outcome {
+            OutCome::CheckMate => Outcome::Checkmate,
+            OutCome::StaleMate => Outcome::Stalemate,
+            OutCome::ThreefoldRepetition => Outcome::ThreefoldRepetition,
+            OutCome::FiftyMoves => Outcome::FiftyMoves,
+            OutCome::InsufficientMaterial => Outcome::InsufficientMaterial,
+            OutCome::Agreement => Outcome::Agreement,
+            OutCome::Resignation => Outcome::Resignation,
         }
     }
 }
@@ -149,6 +178,8 @@ pub struct GameState {
     pub check: bool,
     /// Set only when `phase` is `Finished`.
     pub winner: Option<Color>,
+    /// Why the game ended. `None` while it is still running.
+    pub outcome: Option<Outcome>,
     /// Full move number as shown in notation, starting at 1.
     pub move_number: u32,
     pub pieces: Vec<PlacedPiece>,
@@ -611,17 +642,17 @@ fn snapshot(game: &mut Game) -> GameState {
     let active = game.active_side();
     let check = game.king_in_check(active);
 
-    // Set only once the game is over; `None` while it is still running.
-    let winner = game
-        .game_result()
-        .and_then(|result| result.winner)
-        .map(Color::from);
+    // Both set only once the game is over; `None` while it is still running.
+    let result = game.game_result();
+    let winner = result.and_then(|r| r.winner).map(Color::from);
+    let outcome = result.map(|r| Outcome::from(r.outcome));
 
     GameState {
         phase: game.state().into(),
         active: active.into(),
         check,
         winner,
+        outcome,
         move_number: (half_moves / 2 + 1) as u32,
         pieces,
         captured,

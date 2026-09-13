@@ -11,10 +11,11 @@ import init, {
   type GameState,
   type Kind,
   type LegalMove,
+  type Outcome,
   type PlacedPiece,
 } from '../../../engine/pkg';
 
-export type { Color, GameState, Kind, LegalMove, PlacedPiece };
+export type { Color, GameState, Kind, LegalMove, Outcome, PlacedPiece };
 
 let ready: Promise<void> | null = null;
 

@@ -10,6 +10,7 @@ import {
   promote as enginePromote,
   undo as engineUndo,
   type GameState,
+  type Outcome,
   type PlacedPiece,
 } from './engine';
 
@@ -77,6 +78,17 @@ export const STATUS_LABELS: Record<GameStatus, string> = {
   draw: 'Draw',
 };
 
+// How each finished-game outcome reads. Keys match the engine's `Outcome`.
+const OUTCOME_LABELS: Record<Outcome, string> = {
+  checkmate: 'Checkmate',
+  stalemate: 'Stalemate',
+  threefold_repetition: 'Draw — threefold repetition',
+  fifty_moves: 'Draw — fifty-move rule',
+  insufficient_material: 'Draw — insufficient material',
+  agreement: 'Draw agreed',
+  resignation: 'Resignation',
+};
+
 export const MODE_LABELS: Record<BoardMode, string> = {
   game: 'Game',
   free: 'Free placement',
@@ -109,13 +121,29 @@ function toPieces(placed: PlacedPiece[]): Piece[] {
   }));
 }
 
+// The coarse status drives the colour swatch in GameInfo; `statusLabel` (below)
+// carries the precise wording. Every drawn outcome shares the 'draw' styling.
 function toStatus(state: GameState): GameStatus {
-  if (state.phase === 'finished') {
-    // The API reports a winner for checkmate and none for a draw; it does not
-    // distinguish stalemate from a repetition/50-move draw, so both read "draw".
-    return state.winner ? 'checkmate' : 'draw';
+  if (state.phase !== 'finished') {
+    return state.check ? 'check' : 'active';
   }
-  return state.check ? 'check' : 'active';
+  switch (state.outcome) {
+    case 'checkmate':
+      return 'checkmate';
+    case 'stalemate':
+      return 'stalemate';
+    default:
+      return 'draw';
+  }
+}
+
+// The exact wording shown to the player: the specific ending once finished,
+// otherwise the coarse in-progress/check label.
+function toStatusLabel(state: GameState, status: GameStatus): string {
+  if (state.phase === 'finished' && state.outcome) {
+    return OUTCOME_LABELS[state.outcome];
+  }
+  return STATUS_LABELS[status];
 }
 
 function toHistory(state: GameState): HistoryEntry[] {
@@ -153,6 +181,8 @@ function toHistory(state: GameState): HistoryEntry[] {
 export const game = reactive({
   activePlayer: 'white' as PlayerColor,
   status: 'active' as GameStatus,
+  /** The exact wording for `status` — names the specific drawn ending. */
+  statusLabel: STATUS_LABELS.active,
   mode: 'game' as BoardMode,
   moveNumber: 1,
   captured: { white: [], black: [] } as Record<PlayerColor, PieceType[]>,
@@ -183,6 +213,7 @@ function apply(state: GameState) {
   game.pieces = pieces;
   game.activePlayer = state.active;
   game.status = toStatus(state);
+  game.statusLabel = toStatusLabel(state, game.status);
   game.moveNumber = state.moveNumber;
   game.captured = {
     white: [...state.captured.white],
@@ -327,6 +358,7 @@ function enterFree(pieces: Piece[]) {
   game.moveNumber = 1;
   game.activePlayer = 'white';
   game.status = 'active';
+  game.statusLabel = STATUS_LABELS.active;
   phase.value = 'normal';
 }
 

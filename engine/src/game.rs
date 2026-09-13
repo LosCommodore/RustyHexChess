@@ -346,6 +346,7 @@ impl Game {
     // move ends the game. Must be called whenever the position or the side to move
     // changes, and only while the game is not waiting for a promotion.
     fn update_state(&mut self) {
+        // -- Check three fold repetition
         if self.check_three_fold_repetition() {
             self.state = GameState::GameOver(GameResult {
                 winner: None,
@@ -354,6 +355,15 @@ impl Game {
             return;
         }
 
+        if self.check_is_insufficient_material() {
+            self.state = GameState::GameOver(GameResult {
+                winner: None,
+                outcome: OutCome::InsufficientMaterial,
+            });
+            return;
+        }
+
+        // -- Check for Checkmate, Stalemate and Normal
         self.state = match self.check_king() {
             KingState::CheckMate => GameState::GameOver(GameResult {
                 winner: Some(!self.active_side),
@@ -557,6 +567,30 @@ impl Game {
         // position is the remaining candidate occurrence.
         count += (self.position_hash == self.position_hash_initial) as u32;
         count >= 3
+    }
+
+    // A game is drawn due to insufficient material if it is mathematically impossible to construct a legal checkmate position
+    // King + 1 Bishop vs. King: A single bishop can only traverse hexes of its own color. Because a hex board uses 3 colors (instead of 2), a lone bishop is completely powerless to trap a king.
+    // King + 1 Knight vs. King: Just like standard chess, a single knight cannot trap and mate a lone king by itself.
+    fn check_is_insufficient_material(&self) -> bool {
+        use PieceType::*;
+        let mut knight_or_bishop_count = [0u8; 2];
+
+        for Piece { piece_type, side } in self.board.pieces.values() {
+            let i = *side as usize;
+            match piece_type {
+                Queen | Pawn | Rook => return false,
+                King => (),
+                Bishop | Knight => {
+                    knight_or_bishop_count[i] += 1;
+                    if knight_or_bishop_count[i] > 1 {
+                        return false;
+                    }
+                }
+            }
+        }
+
+        true
     }
 }
 
@@ -833,6 +867,13 @@ mod tests {
             .pieces
             .insert(human(('A', 11)).unwrap(), Piece::new(King, Black));
 
+        // A spectator pawn tucked by the black king: it keeps the starting
+        // position from being an insufficient-material draw (which would end the
+        // game before it begins) without touching the mate over on the f-file.
+        board
+            .pieces
+            .insert(human(('B', 11)).unwrap(), Piece::new(Pawn, Black));
+
         let mut game = Game::from_board(board, Side::White, None).expect("Invalid board ???");
 
         assert_eq!(game.check_king(), KingState::Ok);
@@ -952,6 +993,13 @@ mod tests {
         board
             .pieces
             .insert(human(('K', 6)).unwrap(), Piece::new(King, Black));
+
+        // A spectator pawn by the white king, so the bare-kings starting board is
+        // not an insufficient-material draw before the en-passant play begins. It
+        // sits far from the j-file and never moves.
+        board
+            .pieces
+            .insert(human(('A', 10)).unwrap(), Piece::new(Pawn, White));
 
         let mut game = Game::from_board(board, Side::White, None).expect("Invalid Board ??");
         let white_pawn_origin = human(('J', 1)).unwrap();
@@ -1367,7 +1415,14 @@ mod tests {
         use PieceType::*;
         use Side::*;
 
-        let board = board_with(&[(('A', 11), King, White), (('K', 6), King, Black)]);
+        // The lone kings would be an insufficient-material draw at setup, so a
+        // static central pawn keeps the game alive; it never moves, so the
+        // starting position still recurs as the kings shuffle.
+        let board = board_with(&[
+            (('A', 11), King, White),
+            (('K', 6), King, Black),
+            (('F', 5), Pawn, White),
+        ]);
         let mut game = Game::from_board(board, White, None).expect("valid board");
 
         // One full cycle returns to the starting position; do it twice.
@@ -1407,7 +1462,8 @@ mod tests {
 
         // White captures the black rook -> position X (1st occurrence), then the
         // kings shuffle back to X twice more.
-        game.make_move(pos(('C', 11)), pos(('C', 10))).expect("capture");
+        game.make_move(pos(('C', 11)), pos(('C', 10)))
+            .expect("capture");
         let cycle = [
             (('K', 6), ('K', 5)),
             (('A', 11), ('A', 10)),
