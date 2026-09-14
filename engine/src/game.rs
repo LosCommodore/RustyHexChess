@@ -70,7 +70,8 @@ pub struct GameResult {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct Play {
     pub game_move: GameMove,
-    pub hash: PositionHash, // hash of the position this play produced
+    pub hash: PositionHash,     // hash of the position this play produced
+    pub half_move_clock: usize, // counts for Fifty-Moves rule
 }
 
 #[derive(Copy, Default, Debug, Clone, Serialize)]
@@ -346,23 +347,6 @@ impl Game {
     // move ends the game. Must be called whenever the position or the side to move
     // changes, and only while the game is not waiting for a promotion.
     fn update_state(&mut self) {
-        // -- Check three fold repetition
-        if self.check_three_fold_repetition() {
-            self.state = GameState::GameOver(GameResult {
-                winner: None,
-                outcome: OutCome::ThreefoldRepetition,
-            });
-            return;
-        }
-
-        if self.check_is_insufficient_material() {
-            self.state = GameState::GameOver(GameResult {
-                winner: None,
-                outcome: OutCome::InsufficientMaterial,
-            });
-            return;
-        }
-
         // -- Check for Checkmate, Stalemate and Normal
         self.state = match self.check_king() {
             KingState::CheckMate => GameState::GameOver(GameResult {
@@ -373,7 +357,30 @@ impl Game {
                 winner: None,
                 outcome: OutCome::StaleMate,
             }),
-            KingState::Ok | KingState::Check => GameState::Normal,
+            KingState::Ok | KingState::Check => {
+                if self.half_move_clock() >= 100 {
+                    // Check 50 move rule for draw
+
+                    GameState::GameOver(GameResult {
+                        winner: None,
+                        outcome: OutCome::FiftyMoves,
+                    })
+                } else if self.check_three_fold_repetition() {
+                    // -- Check three fold repetition
+
+                    GameState::GameOver(GameResult {
+                        winner: None,
+                        outcome: OutCome::ThreefoldRepetition,
+                    })
+                } else if self.check_is_insufficient_material() {
+                    GameState::GameOver(GameResult {
+                        winner: None,
+                        outcome: OutCome::InsufficientMaterial,
+                    })
+                } else {
+                    GameState::Normal
+                }
+            }
         };
     }
 
@@ -455,7 +462,17 @@ impl Game {
         self.position_hash
             .update_en_passant(old_en_passant, new_en_passant);
 
+        // -- move counter for 50 move draw rule
+        let half_move_clock = if matches!(game_move.action, Action::Capture { .. })
+            || game_move.piece.piece_type == PieceType::Pawn
+        {
+            0
+        } else {
+            self.half_move_clock() + 1
+        };
+
         self.plays.push(Play {
+            half_move_clock,
             game_move: game_move.clone(),
             hash: self.position_hash,
         });
@@ -528,7 +545,12 @@ impl Game {
         self.position_hash.update_active_player();
 
         let hash = self.position_hash;
-        self.plays.push(Play { game_move, hash });
+
+        self.plays.push(Play {
+            game_move,
+            hash,
+            half_move_clock: self.half_move_clock(),
+        });
 
         self.state = GameState::Normal;
         self.next_turn();
@@ -544,6 +566,7 @@ impl Game {
         for Play {
             game_move: GameMove { piece, action, .. },
             hash,
+            ..
         } in self.plays.iter().rev().skip(1)
         {
             if *hash == self.position_hash {
@@ -591,6 +614,10 @@ impl Game {
         }
 
         true
+    }
+
+    fn half_move_clock(&self) -> usize {
+        self.plays.last().map(|x| x.half_move_clock).unwrap_or(0)
     }
 }
 
