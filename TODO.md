@@ -1,57 +1,8 @@
-# TODO — finishing the game logic
+# TODOs
 
-What the engine still owes a complete game of Gliński hexagonal chess. The game
-logic lives in [game.rs](engine/src/game.rs); its tests are split into
-[game/tests.rs](engine/src/game/tests.rs). Line references drift — trust the
-function names.
+## Code quality
 
-**Focus: completeness, not speed.** The known performance gaps are collected at
-the bottom under *Deferred*; leave them until the rules are complete.
-
-Suggested order: **1 → 2 → 3 → 4 → 5.**
-
-
-## 1. Insufficient material — the hex-specific cases
-
-The safe cases are done; what remains is the part orthodox chess tables get
-wrong on a hex board.
-
-- [ ] **Decide the bishop-complex cases before coding.** Hex bishops are confined
-      to one of *three* colour complexes ([movement.rs](engine/src/movement.rs)),
-      so K+2B (same complex) is still drawn while different complexes may not be,
-      and "K+B vs K+B" depends on the complexes. Today two same-side bishops are
-      always ruled "playable" — safe (never a false draw) but incomplete.
-- [ ] Write the chosen table down in [doc/](doc/) with its reasoning, so the
-      choice is reviewable rather than buried in a match arm.
-- [ ] Tests: one per combination, including the hex bishop-complex distinctions.
-      There is currently **no** committed insufficient-material test.
-
-## 2. Draw offers, resignation, and claim-vs-automatic
-
-`OutCome` already has `Agreement` and `Resignation`, but nothing produces them,
-and threefold / fifty-move are applied automatically rather than on claim.
-
-- [ ] Decide the model: keep threefold and fifty-move **automatic** (simplest,
-      current behaviour), or make them **claimable** per FIDE with fivefold /
-      75-move as the automatic backstop. Claimable needs a command and a
-      `draw_claimable` flag on the snapshot.
-- [ ] Add the API commands in [api.rs](engine/src/api.rs) /
-      [wasm.rs](engine/src/wasm.rs): `resign()`, `offer_draw()` / `accept_draw()`,
-      and `claim_draw()` if going the claimable route, with matching `ErrorCode`s.
-- [ ] `undo` of an agreed/claimed draw: that state is *not* derivable from the
-      position, unlike mate/repetition, so decide what taking it back means.
-
-## 3. Notation completeness
-
-[`played_move`](engine/src/api.rs) produces a usable but incomplete algebraic:
-
-- [ ] No `+` / `#` check and checkmate suffixes.
-- [ ] No disambiguation when two like pieces (e.g. two knights) can reach the same
-      square.
-- [ ] En passant renders as an ordinary capture.
-- [ ] The promotion entry renders as `f11=Q` with no origin square.
-
-## 4. Panic policy at the boundaries
+### Panic policy at the boundaries
 
 Crash-on-broken-invariant is the intended policy; what's missing is making the
 *deliberate* panics legible and distinct from unexamined ones.
@@ -66,7 +17,7 @@ Crash-on-broken-invariant is the intended policy; what's missing is making the
       `console_error_panic_hook` so the crash is legible, and settle the JS-side
       recovery unit — most likely "this `Game` is dead, make a fresh one."
 
-## 5. Tests the engine still lacks
+### Tests the engine still lacks
 
 - [ ] **Perft node counts** from the start position to a fixed depth — the single
       highest-value move-generator test, and there are none.
@@ -81,9 +32,37 @@ Crash-on-broken-invariant is the intended policy; what's missing is making the
       (clippy warns on the struct pattern for a unit variant; `assert_eq!` would
       assert more).
 
----
+## Prio2 Topics
 
-## Deferred — optimization, out of scope for now
+### Draw offers, resignation, and claim-vs-automatic
+
+`OutCome` already has `Agreement` and `Resignation`, but nothing produces them,
+and threefold / fifty-move are applied automatically rather than on claim.
+
+- [ ] Decide the model: keep threefold and fifty-move **automatic** (simplest,
+      current behaviour), or make them **claimable** per FIDE with fivefold /
+      75-move as the automatic backstop. Claimable needs a command and a
+      `draw_claimable` flag on the snapshot.
+- [ ] Add the API commands in [api.rs](engine/src/api.rs) /
+      [wasm.rs](engine/src/wasm.rs): `resign()`, `offer_draw()` / `accept_draw()`,
+      and `claim_draw()` if going the claimable route, with matching `ErrorCode`s.
+- [ ] `undo` of an agreed/claimed draw: that state is *not* derivable from the
+      position, unlike mate/repetition, so decide what taking it back means.
+
+
+## Prio 3 - Optional future Topics 
+
+### Notation completeness
+
+[`played_move`](engine/src/api.rs) produces a usable but incomplete algebraic:
+
+- [ ] No `+` / `#` check and checkmate suffixes.
+- [ ] No disambiguation when two like pieces (e.g. two knights) can reach the same
+      square.
+- [ ] En passant renders as an ordinary capture.
+- [ ] The promotion entry renders as `f11=Q` with no origin square.
+
+### Performance optimization
 
 Known and deliberately parked until the rules are complete:
 
@@ -96,3 +75,18 @@ Known and deliberately parked until the rules are complete:
   alongside the outcome in `update_state`.
 - A FEN-equivalent import/export: nice-to-have, and would let `from_board` seed a
   starting half-move clock and hand a compact position key to any external tool.
+
+### Insufficient material — the hex-specific cases
+
+The safe cases are done; what remains is the part orthodox chess tables get
+wrong on a hex board.
+
+- [ ] **Decide the bishop-complex cases before coding.** Hex bishops are confined
+      to one of *three* colour complexes ([movement.rs](engine/src/movement.rs)),
+      so K+2B (same complex) is still drawn while different complexes may not be,
+      and "K+B vs K+B" depends on the complexes. Today two same-side bishops are
+      always ruled "playable" — safe (never a false draw) but incomplete.
+- [ ] Write the chosen table down in [doc/](doc/) with its reasoning, so the
+      choice is reviewable rather than buried in a match arm.
+- [ ] Tests: one per combination, including the hex bishop-complex distinctions.
+      There is currently **no** committed insufficient-material test.
