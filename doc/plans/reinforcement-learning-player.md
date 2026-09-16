@@ -1,70 +1,32 @@
-# RustyHexChess: Plan for a Mediocre RL Computer Player
+# RustyHexChess: Plan for an RL Computer Player
 
-**Status:** proposal, no code written yet.
-**Scope:** engine (Rust) + a new Python training project. Frontend is out of scope.
-**Goal:** an opponent that reliably beats a random-mover, does not hang pieces for free, and finds one- and two-move tactics. Not a strong engine.
+**Status:** high-level plan, no RL code written yet.
+**Companion:** [reinforcement-learning-explainer.md](reinforcement-learning-explainer.md) explains the concepts this plan assumes.
+**Goal:** a *mediocre* opponent, built by reinforcement learning, as a learning project. Mediocre means: almost always beats a random mover, rarely hangs pieces, roughly even against a 2-ply alpha-beta. Nothing stronger is wanted.
+**Scope:** `engine` (Rust) gets a small RL-facing surface; a new Python project does the learning. The frontend is out of scope until the very end.
 
 ---
 
-## 1. Core question: is the Rust engine suitable for RL?
+## 1. Where the engine stands
 
-**Short answer: yes in principle, no as it stands today.** The foundations are right; three specific gaps block a self-play loop, and all three are ordinary work rather than redesign.
+The engine already has most of what an RL loop needs. The list below is what
+matters for this plan, not a general review.
 
-### What already works in your favour
-
-| Property | Where | Why it matters for RL |
+| RL needs | Engine today | Status |
 |---|---|---|
-| Make/unmake on the board | [board.rs:204-246](../../engine/src/board.rs#L204-L246) `execute` / `undo` | Tree search and rollouts can mutate in place instead of cloning the whole state per node. This is the single most valuable thing you already have. |
-| `Game` and `Board` are `Clone` | [lib.rs:59](../../engine/src/lib.rs#L59), [board.rs:60](../../engine/src/board.rs#L60) | Cheap-enough snapshotting for MCTS roots, replay buffers, and parallel envs. |
-| Deterministic board iteration | `BTreeMap<Position, Piece>` | Move generation order is stable, so a move → action-index mapping is reproducible across runs. Reproducibility is what usually breaks first in RL pipelines. |
-| Small, readable rule surface | [movement.rs](../../engine/src/movement.rs) is table-driven | Adding a bulk move generator is mechanical, not a rewrite. |
-| Legal-move filtering already exists once | [lib.rs:164-190](../../engine/src/lib.rs#L164-L190) `check_king` | The execute → test → undo pattern you need is already written; it just needs to run every turn, not only when in check. |
-| Test culture | 18 tests, insta snapshots | Gives you somewhere to hang the correctness work in §3. |
+| Rules enforced (pinned pieces, check) | [game.rs](../../engine/src/game.rs) `get_movement_options` filters via `move_leaves_king_in_check`; `validate_move` uses it | ✅ done |
+| Games always terminate | checkmate, stalemate, threefold, fifty-move, insufficient material in `update_state` | ✅ done (insufficient-material bishop cases still open, harmless for RL) |
+| Position hash | [zobrist.rs](../../engine/src/zobrist.rs) `PositionHash` | ✅ done |
+| Plain mutable API | `Game` is a flat struct with `GameState::{Normal, Promotion, GameOver}`; `make_move`, `promote`, `undo` | ✅ the typestate refactor the old plan feared is gone |
+| A clean outward API | [api.rs](../../engine/src/api.rs) `GameApi` | ✅ exists, but string-based (`"f5"`) — fine for a UI, too slow to drive a training loop |
+| **All legal moves for the side to move** | only per piece; `player_has_movement_options` stops at the first one | ❌ missing — the one real gap |
+| Fixed move ↔ integer mapping | — | ❌ missing |
+| Board → tensor encoding | — | ❌ missing |
+| Python access | — | ❌ missing |
+| Speed | known O(n²) with allocations, deliberately parked ([TODO.md](../../TODO.md)) | ⚠ unknown; must be measured |
+| Rules confidence | no perft, no random-playout test | ⚠ open TODO items |
 
-### Blocker A — there is no "all legal moves for the side to move"
-
-`get_movement_options(pos)` works per *piece* ([lib.rs:192](../../engine/src/lib.rs#L192)). Nothing enumerates the whole move list. Every part of an RL system needs that list on every ply: the action mask, MCTS expansion, the policy target, and the terminal test. Today Python would have to loop over 91 cells across FFI to reconstruct it — hundreds of boundary crossings per move.
-
-### Blocker B — the moves that are generated are pseudo-legal
-
-`get_movement_options` does not remove moves that leave your own king in check, and `validate_move` ([lib.rs:301](../../engine/src/lib.rs#L301)) does not consult `check_king`. Consequences:
-
-- A pinned piece can legally be moved away, exposing the king.
-- When you *are* in check, `check_king` computes `allowed_moves` — and then nothing enforces them; `make_move` accepts any pseudo-legal move.
-- Because a king can therefore be captured, `king_in_check` can hit its `panic!("King is missing on board")` ([lib.rs:152](../../engine/src/lib.rs#L152)).
-
-For a human UI this is a bug you'd notice and fix. For RL it is fatal in a quieter way: the agent will *find* these holes, since exploiting an illegal escape is the cheapest way to avoid losing. You would train a policy against the wrong game.
-
-Two related sharp edges to fix at the same time:
-
-- `get_movement_options` appends `get_en_passant_moves()` unconditionally ([lib.rs:194](../../engine/src/lib.rs#L194)), so asking for a *rook's* moves also returns pawn en-passant moves. `validate_move` then matches only on `destination`, so a rook can be dispatched into a pawn's en-passant move. It also duplicates those moves once per piece inside `check_king`.
-- `king_in_check(kings_side)` uses `self.active_side`, not `kings_side`, to locate the king ([lib.rs:149-151](../../engine/src/lib.rs#L149-L151)). Today every call site passes `active_side`, so it is latent — but a legality filter will want to ask about either side.
-
-### Blocker C — games do not terminate
-
-Only checkmate ends a game ([lib.rs:259-271](../../engine/src/lib.rs#L259)). There is no stalemate, no threefold repetition, no fifty-move rule, no insufficient-material draw. Two weak self-play policies will shuffle two kings forever. Without terminal conditions there is no reward signal and no episode boundary, so there is no RL.
-
-### The other thing to know: the typestate API fights a tight loop
-
-`make_move` consumes `self` and returns `NextTurn::{Continued, PromotionRequired, GameOver}` ([lib.rs:324](../../engine/src/lib.rs#L324)). That is genuinely nice for the UI — it is why `doc/type_state_pattern.md` exists — but a self-play loop wants `step(action) -> (obs, reward, done)` with a stable object identity, and threading a moved-and-rebound value through a three-way match a million times per training run is friction with no upside.
-
-**Recommendation: do not refactor the typestate.** Add a thin `engine::rl` facade beside it that owns a `Game` in an `Option`/enum internally and exposes a flat mutable API. The UI keeps its types; RL gets its loop; neither constrains the other.
-
-### Performance: adequate, but measure before you assume
-
-Everything allocates. `pieces_by_side` builds a fresh `HashMap` per call, `get_movement_options` returns a fresh `Vec` per piece with cloned `Piece` values, and `check_king` calls both in a nested loop. A legality filter costs roughly (moves × enemy pieces × moves-per-piece) allocations per ply.
-
-Order-of-magnitude guess for a naive legal generator on this data layout: **a few thousand fully-legal positions/second/core in release mode.** A bitboard engine does millions. For *mediocre* that is survivable — but it decides your algorithm, so measure it first (§3, Step 0) rather than guessing. Cheap wins if the number disappoints: return `SmallVec`, make `Piece` a `Copy` byte, replace `BTreeMap` with a flat `[Option<Piece>; 91]` array indexed by cell id, and cache the king's position.
-
-### Verdict
-
-| Question | Answer |
-|---|---|
-| Is the architecture suitable? | Yes — make/unmake, clonable state, table-driven rules. |
-| Is it usable today? | No — no bulk legal move generation, illegal moves accepted, games never end. |
-| Is the fix a rewrite? | No. Roughly 400–600 lines of additive Rust (§3), no change to existing types. |
-| Biggest risk? | Not RL at all: it is move-generation *correctness*. A subtly wrong generator produces an agent that is excellent at a game nobody else plays. |
-| Second biggest risk? | Cold start. See §5. |
+So the Rust work is additive and small. The bulk of the project is Python — which suits you.
 
 ---
 
@@ -72,261 +34,203 @@ Order-of-magnitude guess for a naive legal generator on this data layout: **a fe
 
 ```mermaid
 graph TD
-    A["🐍 Python: training
-    • PyTorch policy/value net
-    • MCTS or PPO
-    • replay buffer, eval, Elo"]
-    B["🔗 PyO3 + maturin
-    • hexchess.VecEnv
-    • zero-copy numpy views
-    • GIL released during step"]
-    C["🦀 engine::rl facade
-    • legal_moves()
-    • step(action_idx)
-    • encode_obs() → planes
-    • terminal / draw rules"]
-    D["🦀 existing engine
-    • Board execute/undo
-    • movement patterns
-    • Game<T> typestate (UI)"]
-
-    A -->|"one call per batch of N envs"| B
-    B --> C
-    C --> D
+    PY["🐍 training/ (Python, PyTorch)<br/>network · MCTS · self-play · evaluation"]
+    BI["🔗 bindings/ (PyO3 + maturin)<br/>hexchess module: env.step(), legal_mask(), encode()"]
+    RL["🦀 engine::rl<br/>legal_moves() · action index · obs planes · step()"]
+    EN["🦀 engine (existing)<br/>Game · Board · rules · zobrist"]
+    PY -->|batches of games, numpy in/out| BI --> RL --> EN
 ```
 
-The rule that keeps this fast: **the game loop lives in Rust.** Python sends a batch of `N` action indices, Rust steps all `N` games (in parallel via rayon, GIL released) and returns stacked observations, rewards, done flags and legal masks as numpy arrays. One FFI crossing per batch step, not per move. With `N = 256` the Python-side overhead stops mattering and your GPU sees full batches.
+Design rules:
 
-Skip JSON-over-stdin and skip reusing the wasm build. `serde` on `Game` is `Serialize` only (no `Deserialize`), and serialising a position per ply would cost more than generating the moves.
+* **The game loop stays in Rust; the learning stays in Python.** Python calls
+  Rust once per batch of games, not once per move.
+* **Do not touch `GameApi` or the wasm surface.** `engine::rl` is a sibling
+  facade over `Game`, with integer actions instead of strings.
+* **Start with the simplest thing that runs end to end**, then make it fast.
+  A single-game env and a naive Python MCTS are the first milestone, not a
+  vectorised rayon env.
 
 ---
 
-## 3. Phase 1 — Make the engine RL-ready (Rust, ~1–2 weeks part-time)
+## 3. Phases
 
-This phase contains no machine learning. It is the phase most likely to be rushed, and the one where rushing is most expensive.
+Each phase ends with a gate. Passing the gate matters more than the estimates.
 
-### Step 0 — Benchmark first
+### Phase 0 — Know what you have (Rust, ~2 days)
 
-Add `criterion` and measure, in release mode:
-1. Pseudo-legal move generation for a mid-game position.
-2. A full random playout to a fixed 200-ply cap.
+1. **Perft** from the start position, depth 1–4, as a snapshot test. There are no
+   published numbers for this variant, so this locks in *current* behaviour
+   rather than proving correctness — and that is what protects later speedups.
+2. **Random playouts**: 10 000 random games, no panic, every game reaches
+   `GameOver`. Record the distribution of game lengths and outcomes — this
+   also answers the open "ply cap" question.
+3. **Benchmark** (criterion): legal move generation for a mid-game position and
+   one full random playout, release mode. Write the two numbers down.
 
-Write the two numbers down. They pick your algorithm in §5, and they are the baseline for every optimisation afterwards.
+*Gate:* the numbers exist. If a random playout takes more than a few
+milliseconds, plan a speed pass for Phase 1; if not, skip it.
 
-### Step 1 — Bulk legal move generation
+### Phase 1 — The RL surface in Rust (~1 week)
 
-```rust
-// new: engine/src/legal.rs
-impl<T> Game<T> {
-    /// Every pseudo-legal move for `side`, en-passant included exactly once.
-    pub fn pseudo_legal_moves(&self, side: Side) -> Vec<GameMove>;
+New module `engine/src/rl.rs` (or a small `rl/` directory):
 
-    /// pseudo_legal_moves filtered by execute → king_in_check → undo.
-    pub fn legal_moves(&self) -> Vec<GameMove>;
-}
-```
+* `Game::legal_moves() -> Vec<GameMove>` — the missing bulk generator, built
+  from the existing per-piece filter.
+* **Action index**: flat `origin × destination`, 91 × 91 = 8281, from a frozen
+  enumeration of cells. Round-trip test over all indices. *Freeze it*: changing
+  it later invalidates every checkpoint.
+* **Observation planes** `(C, 11, 11)`, side-to-move perspective (mirrored for
+  Black). Piece planes, on-board mask, side, en-passant, halfmove clock.
+* `RlGame { new, reset, step(action) -> (reward, done), legal_mask(), encode() }`.
+  `step` auto-promotes to queen so `GameState::Promotion` never reaches the
+  agent.
+* Scripted opponents, because you need them in every later phase:
+  `random`, `greedy` (1-ply material), `alphabeta(depth)` with material +
+  mobility. Depth 2–3 alpha-beta is itself a mediocre player and doubles as the
+  imitation teacher.
 
-`legal_moves` is the same execute/test/undo loop `check_king` already runs — lift it out and run it every ply, not only when in check. While you are in there, move the en-passant generation out of `get_movement_options` so it is emitted once per side rather than once per queried piece.
+*Gate:* alpha-beta depth 2 beats random ≥ 95% over 200 games, played entirely in Rust.
 
-### Step 2 — Enforce legality and add terminal conditions
+### Phase 2 — Python bindings (~3 days)
 
-- `validate_move` accepts only moves in `legal_moves()`.
-- `next_turn` classifies the position after computing `legal_moves()` for the new side to move:
+* Workspace crate `bindings/` with PyO3 + maturin, exposing `RlGame` and the
+  scripted opponents. Numpy arrays in and out.
+* First a single-game `Env`; then `VecEnv(n)` that steps `n` games per call.
+  Releasing the GIL and using rayon inside `VecEnv` is the *one* optimisation
+  worth doing early, since it multiplies throughput by your core count.
+* Python project `training/` with `uv`, PyTorch, numpy. Tests that a random
+  agent through the bindings reproduces the Phase 0 statistics.
 
-| Condition | Result |
-|---|---|
-| no legal moves, king in check | checkmate — mover wins |
-| no legal moves, king not in check | **stalemate — draw** |
-| position seen 3× | **draw** (needs a repetition counter) |
-| 100 plies without capture or pawn move | **draw** (needs a halfmove clock) |
-| K vs K, K+B vs K, K+N vs K | **draw** |
+*Gate:* the same 10 000-random-game statistics, from Python.
 
-Add `GameOver { winner: Option<Side> }` or a `Draw` state — draws are currently unrepresentable. Repetition detection wants a Zobrist hash; a plain hash of the `BTreeMap` plus side-to-move is enough to start.
+### Phase 3 — Supervised bootstrap (~3 days)
 
-> Gliński hex chess has no castling and a lone bishop covers only one of three colour complexes, so the insufficient-material set differs from orthodox chess. If the fine detail is unclear, ship the first three rules and leave insufficient-material to the ply cap.
+The first learning that happens, and it is *not* RL yet on purpose: it
+validates the network, the encodings and the training loop with clean labels.
 
-### Step 3 — Correctness harness
+* Generate ~100k positions from alpha-beta self-play (randomised openings,
+  ~10 % random moves for diversity), each labelled with the teacher's move and
+  the game result.
+* Network: small ResNet, ~6 blocks × 64 filters (~1M parameters), policy head
+  over 8281 masked logits, value head with `tanh`.
+* Train; evaluate the raw policy (no search) on the ladder.
 
-Standard perft has no published reference numbers for this variant, so lean on self-consistency instead:
+*Gate:* the search-free network beats random ≥ 95 % and greedy ≥ 60 %.
+That is already close to "mediocre", achieved by imitation.
 
-- **Perft self-consistency:** node counts at depth 1–4 from the opening. They will not validate absolute correctness, but they lock in behaviour so a later "optimisation" cannot silently change the rules.
-- **Property tests** (`proptest`) over random playouts:
-  - `execute` then `undo` restores the board bit-for-bit (extend the existing `test_undo`).
-  - no move in `legal_moves()` leaves your own king in check.
-  - a king is never captured — no `Action::Capture` ever names a `King`.
-  - every game reaches a terminal state within the ply cap.
-- **10,000 random self-play games** with no panic and no assertion failure. This is the real gate. Run it before you train anything; finding a rules bug after a week of GPU time is a bad afternoon.
+### Phase 4 — The RL loop (~2 weeks, open-ended)
 
-### Step 4 — The `engine::rl` facade
+The point of the project. Recommended order:
 
-```rust
-pub struct RlGame { /* wraps Game<NormalTurn> | Game<PromotePawn> | terminal */ }
+1. **MCTS in Python** over the single-game env, with batched leaf evaluation
+   across a handful of parallel games. Slow but transparent — you will want to
+   read every line of it once.
+2. **Self-play → replay buffer → train → evaluate → promote**, as one script
+   with checkpointing, so an overnight run can be resumed.
+3. Start from the Phase 3 network. 50 simulations per move, temperature for the
+   first 15 plies, Dirichlet noise at the root.
+4. Only when it works: move MCTS or the whole self-play worker to Rust if
+   throughput is the bottleneck.
 
-impl RlGame {
-    pub fn new() -> Self;
-    pub fn legal_mask(&self, out: &mut [bool; N_ACTIONS]);
-    pub fn step(&mut self, action: u16) -> StepResult; // { reward, done, winner }
-    pub fn encode(&self, out: &mut [f32]);             // planes, §4
-    pub fn reset(&mut self);
-}
-```
+Alternative if MCTS feels like too much machinery at first: **PPO** with a
+frozen-opponent pool, starting from the Phase 3 network. It is simpler, every RL
+library has it, and the bootstrap makes it viable. It plateaus lower, but
+"lower" is still within the goal.
 
-Auto-promote to queen inside `step` so `PromotePawn` never surfaces as an agent decision. Underpromotion is worth roughly nothing at this strength and doubles your action-space headaches; add it later if you ever care.
+*Gate:* a checkpoint that beats the Phase 3 network ≥ 55 % *and* has not lost
+ground on the fixed ladder.
 
-### Step 5 — Action space
+### Phase 5 — Evaluation (from Phase 1 onward, not a phase of its own)
 
-Flat **origin × destination = 91 × 91 = 8281** indices. Cell ids come from a fixed enumeration of the valid `(y, x)` pairs in `X_RANGE` ([coordinates.rs:21](../../engine/src/coordinates.rs#L21)).
+* Ladder: random → greedy → alpha-beta d2 → d3. ≥ 200 games per pairing,
+  alternating colours.
+* Relative Elo from a round-robin of checkpoints (~50 lines of Python).
+* One plot: Elo vs training iteration. That plot *is* the project's result.
 
-It is sparse (~1–2% of indices are ever legal) and that is fine — masking handles it, and it is unambiguous, trivial to invert, and impossible to get subtly wrong. A ray-based encoding (origin × 12 directions × distance) would be ~4× smaller but introduces an off-by-one class of bug that costs more than the parameters it saves. Revisit only if the policy head measurably dominates your training cost.
+### Phase 6 — Play against it (optional, later)
 
-Freeze this mapping and test it round-trips (`move → index → move`). Changing it later invalidates every checkpoint you have.
-
----
-
-## 4. Phase 2 — Python bindings and Gym environment (~3–5 days)
-
-### Bindings
-
-`PyO3` + `maturin`, as a second crate `bindings/` in the workspace so the engine crate stays dependency-free.
-
-```python
-import hexchess
-env = hexchess.VecEnv(n=256)
-obs, mask = env.reset()                 # (256, C, 11, 11) f32, (256, 8281) bool
-obs, mask, reward, done = env.step(actions)   # actions: (256,) int32
-```
-
-Return numpy arrays backed by Rust-owned buffers (`numpy` crate) so nothing is copied. Release the GIL in `step` and drive the inner loop with `rayon` — on 8 cores that is close to an 8× throughput multiplier, and it is the difference between an overnight run and a weekend run.
-
-### Observation encoding
-
-`(C, 11, 11)` float planes over the 11×11 bounding grid, with off-board cells zeroed:
-
-| Planes | Content |
-|---|---|
-| 0–11 | 6 piece types × 2 sides, one-hot occupancy |
-| 12 | on-board mask (the hexagon's ragged edge) |
-| 13 | side to move (constant plane) |
-| 14 | en-passant target |
-| 15 | halfmove clock, normalised |
-| 16 | repetition count of the current position |
-
-Always encode **from the side-to-move's perspective** (mirror for Black) so the network learns one policy instead of two.
-
-**On convolutions over a hex board:** the axial `(y, x)` layout already used here has exactly 6 neighbours — `(0,±1)`, `(±1,0)`, `(1,-1)`, `(-1,1)`, per the direction constants in [movement.rs:8-18](../../engine/src/movement.rs#L8-L18). All six fall inside a 3×3 window, so a standard `Conv2d(3,3)` covers the true hex neighbourhood plus two corners that are not adjacent. The network learns to ignore those two. **Ordinary square convolutions are fine here** — you do not need hex-specific layers, and this is the main reason a square-grid architecture transfers to this game at all.
-
-### Sanity gate before any training
-
-A `RandomAgent` playing 1,000 games through the Python bindings, with results matching pure-Rust random self-play statistically. If the two disagree, the bug is in the bindings, and you want to know that now.
+Export the network (ONNX) and run it in the browser with `onnxruntime-web`, or
+in Rust via a wasm-capable inference crate. Without search it is a few
+milliseconds per move; with a shallow MCTS still interactive. Not needed for the
+learning goal — just satisfying.
 
 ---
 
-## 5. Phase 3 — Training
+## 4. Compute: where to train
 
-### The cold-start problem, and why to sidestep it
+The honest sizing first: a ~1M-parameter network with 50 MCTS simulations per
+move is a *small* run. Self-play generation is CPU-bound and scales with cores;
+training is GPU-friendly but tiny.
 
-Pure self-play RL from random initialisation on a game with ~50–100 legal moves per position and a reward that only arrives at checkmate is a *hard* exploration problem. Random players essentially never checkmate each other; they hit the ply cap and draw. Your learning signal is close to zero for a long time, and this is the specific reason most hobby chess-RL projects stall.
+| Option | Good for | Rough cost | Notes |
+|---|---|---|---|
+| **Your own machine** | everything up to Phase 3; overnight Phase 4 runs | free | Start here. If it has 8+ cores, it may be all you need. |
+| **Free notebooks** (Google Colab, Kaggle) | Phase 3 training, short Phase 4 experiments | free, limited hours/session | Fine for the GPU part; awkward for long self-play, which needs many CPU cores, not one GPU. |
+| **Rented CPU box** (Hetzner Cloud, Contabo, similar) | self-play generation at scale | on the order of a few € per day for 8–16 vCPUs | Best fit for the CPU-bound half. Run the whole loop there; train on CPU if the net is this small. |
+| **Rented GPU** (vast.ai, RunPod, Lambda) | if training becomes the bottleneck | on the order of 0.2–0.5 $/h for a consumer GPU | Overkill until measured. Rent by the hour, keep data off the box. |
 
-**Recommended: bootstrap by imitation, then improve by RL.**
+Recommendation:
 
-#### Stage A — Search-based teacher (~2 days)
+1. Build and debug everything locally. Bugs are far cheaper to find at zero
+   cost per hour.
+2. When Phase 4 works end to end and you want a longer run, rent **one CPU box
+   with many cores** for a few days rather than a GPU. The network is small
+   enough that CPU training is acceptable, and the self-play throughput is what
+   you are paying for.
+3. Budget expectation: tens of euros for the whole project, not hundreds.
+   Prices above are order-of-magnitude as of writing — check before renting.
 
-Write a plain alpha-beta searcher in Rust: material values (P 1, N 3, B 3, R 5, Q 9), a small mobility bonus, alpha-beta with move ordering (captures first, MVV-LVA), depth 3.
-
-Two things fall out of this, both of which you need anyway:
-
-1. **A benchmark opponent.** Without a fixed reference you cannot tell improvement from drift; self-play win rates measure only relative strength and happily rise while absolute strength falls.
-2. **Honest expectations.** Depth-3 alpha-beta with material eval *is already a mediocre player*. If "mediocre" is genuinely the goal, this phase alone delivers it in ~2 days. Everything after it is because you want to build an RL system — which is a completely legitimate reason, and worth naming out loud so the RL phases are judged as learning-and-fun rather than as the cheapest route to the stated goal.
-
-#### Stage B — Supervised bootstrap (~2 days + a few GPU-hours)
-
-Generate ~100k positions of depth-3 self-play (with randomised openings and ~10% random moves for diversity). Train the network on two heads:
-- **policy** → cross-entropy against the teacher's chosen move
-- **value** → MSE against the game's final result
-
-Network: ResNet, 6 blocks × 64 filters, ~1M parameters. Small enough to train on a single consumer GPU (or patiently on CPU), large enough for this task.
-
-You now have a network that plays at roughly teacher strength *without any search*. Cold start solved.
-
-#### Stage C — AlphaZero-style self-play loop (open-ended)
-
-```mermaid
-graph LR
-    A[self-play<br/>MCTS, 50-100 sims/move] --> B[replay buffer<br/>~500k positions]
-    B --> C[train policy + value<br/>a few epochs]
-    C --> D[evaluate vs<br/>previous best + alpha-beta]
-    D -->|"win rate > 55%"| E[promote checkpoint]
-    E --> A
-    D -->|otherwise| A
-```
-
-- **MCTS:** PUCT, Dirichlet noise at the root, temperature 1.0 for the first ~15 plies then near-0. 50–100 simulations per move — Stage B's prior is good enough that you do not need AlphaZero's 800.
-- **Where MCTS runs:** implement it in Rust if the Step-0 benchmark says the engine is slow, in Python (numpy, batched leaf evaluation) if it is fast. Batched leaf evaluation across parallel games is what keeps the GPU busy; single-game MCTS will leave it idle ~95% of the time.
-- **Sizing:** with 8 cores and one consumer GPU, expect on the order of days for a clear improvement over Stage B. This is the honest number, not a discouragement.
-
-#### Alternative — PPO without search
-
-Simpler to implement, and reasonable if MCTS feels like too much machinery. Self-play with a frozen-opponent pool, reward = game result plus shaped material delta (small coefficient, ~0.01/pawn, decayed toward zero as training progresses). Learns noticeably slower per unit of compute and plateaus lower — but Stage B's bootstrap makes it viable, and it is a good first RL loop if the goal is to learn RL.
-
-### Evaluation
-
-Do this from day one; skipping it is how you end up unable to answer "is it better?"
-
-- **Fixed opponent ladder:** random → greedy-material (depth 1) → alpha-beta depth 2 → depth 3.
-- **Relative Elo** from a round-robin among your own checkpoints (`bayeselo`, or ~50 lines of your own).
-- ≥200 games per pairing with alternating colours — win rates on 20 games are noise.
-- **Milestone definitions:**
-  - *Working:* >95% vs random.
-  - *Not embarrassing:* >80% vs greedy-material — i.e. it stops hanging pieces.
-  - **Mediocre (target): >50% vs alpha-beta depth 2.**
-  - *Better than expected:* >50% vs alpha-beta depth 3.
+Practicalities that save money: containerise the training environment so a
+rented box is ready in minutes; write checkpoints and the replay buffer to
+object storage or rsync them home; make every script resumable.
 
 ---
 
-## 6. Suggested layout
+## 5. Suggested layout
 
 ```
 RustyHexChess/
-├── engine/                  # unchanged public API
-│   └── src/
-│       ├── legal.rs         # NEW  bulk legal move generation
-│       ├── terminal.rs      # NEW  draws, stalemate, repetition
-│       ├── rl.rs            # NEW  RlGame facade, action encoding, obs planes
-│       └── search.rs        # NEW  alpha-beta teacher / benchmark opponent
-├── bindings/                # NEW  PyO3 crate → `hexchess` python module
-└── training/                # NEW  python project (uv or poetry)
-    ├── net.py               # ResNet policy+value
+├── engine/
+│   ├── src/rl.rs            # NEW  legal_moves, action index, obs planes, RlGame
+│   ├── src/search.rs        # NEW  random / greedy / alpha-beta opponents
+│   └── benches/             # NEW  criterion
+├── bindings/                # NEW  PyO3 crate → python module `hexchess`
+└── training/                # NEW  python project (uv)
+    ├── net.py               # ResNet policy + value
     ├── mcts.py
     ├── selfplay.py
     ├── train.py
-    └── evaluate.py          # ladder + Elo
+    ├── evaluate.py          # ladder + Elo + the plot
+    └── bootstrap.py         # Phase 3 dataset + supervised training
 ```
 
 ---
 
-## 7. Ordered checklist
+## 6. Risks, in order
 
-| # | Task | Est. | Gate to pass before moving on |
-|---|---|---|---|
-| 1 | Criterion benchmarks | 0.5d | Two numbers written down |
-| 2 | `pseudo_legal_moves` + `legal_moves` | 2d | Pinned pieces cannot move |
-| 3 | En-passant scoping fix; `king_in_check` side fix | 0.5d | Rook can no longer take an en-passant move |
-| 4 | Stalemate, repetition, 50-move, ply cap | 1.5d | Every random game terminates |
-| 5 | Perft snapshots + proptest suite | 1.5d | 10k random games, zero panics |
-| 6 | `RlGame` facade + action encoding | 1.5d | Round-trip test on all 8281 indices |
-| 7 | PyO3 bindings + `VecEnv` | 2d | Random agent stats match Rust-side stats |
-| 8 | Alpha-beta teacher | 2d | Beats random >95% |
-| 9 | Network + supervised bootstrap | 2d | Matches teacher without search |
-| 10 | MCTS + self-play loop | 4d | Beats Stage B checkpoint |
-| 11 | Eval ladder + Elo | 1d | Reproducible strength curve |
-
-Steps 1–7 are prerequisites regardless of which learning algorithm you pick. **Step 8 alone reaches "mediocre";** 9–11 are how you get there *via reinforcement learning*, which is the actual point.
+1. **Rules bugs.** An agent will find and exploit any hole, and you would train a
+   strong player of the wrong game. Perft and random-playout tests (Phase 0) are
+   the guard; run them before every optimisation.
+2. **Engine too slow for the loop.** Decided by the Phase 0 numbers. Mitigations
+   are known and local: flat `[Option<Piece>; 91]` instead of `BTreeMap`, `Copy`
+   pieces, cached king position, attack maps.
+3. **Cold start.** Handled by the supervised bootstrap (Phase 3). Do not skip it
+   to be "pure".
+4. **Evaluation noise.** 20-game win rates lie. Enforce ≥ 200 games and a fixed
+   ladder from Phase 1 onward.
+5. **Scope creep toward strength.** The goal is a working loop and a strength
+   curve. Underpromotion, hex-specific insufficient-material tables, and
+   bitboards are all out unless a gate demands them.
 
 ---
 
-## 8. Open questions
+## 7. Open decisions
 
-1. **Ply cap for training games.** Suggest 300; needs a look at typical hex-chess game length.
-2. **Insufficient material in Gliński hex chess.** The three-colour-complex bishop geometry changes which endings are drawn. Ply cap covers this if the rules are unclear.
-3. **Is `wasm-bindgen` staying in `engine/Cargo.toml`?** It is currently a dependency with no `#[wasm_bindgen]` exports anywhere. Out of scope here, but it will be in the way when you split out the `bindings/` crate.
-4. **Compute budget.** GPU or CPU-only? CPU-only is entirely workable at this network size, but shifts the recommendation toward PPO over MCTS.
+| Decision | Default | Revisit when |
+|---|---|---|
+| Ply cap for training games | measure in Phase 0; likely 300 | random-playout length distribution says otherwise |
+| MCTS in Python or Rust | Python first | self-play throughput blocks Phase 4 |
+| AlphaZero-style vs PPO | AlphaZero-style (it is the concept worth learning) | MCTS becomes a wall; PPO is the fallback, not a failure |
+| Local vs rented compute | local until Phase 4 works | a run takes more than one night |
+| Where `wasm-bindgen` lives | leave as is | the `bindings/` crate build fights it |
